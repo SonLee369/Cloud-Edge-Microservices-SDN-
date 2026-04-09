@@ -1,0 +1,815 @@
+\documentclass[aspectratio=169, 12pt]{beamer}
+
+%=============================================================================
+% PACKAGES
+%=============================================================================
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+%=============================================================================
+% THEME
+%=============================================================================
+\usetheme{Madrid}
+\usecolortheme{whale}
+
+% Custom colors
+\definecolor{ptitblue}{RGB}{0, 70, 127}
+\definecolor{ptitgold}{RGB}{204, 153, 0}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+\definecolor{alertred}{RGB}{180, 0, 0}
+
+\setbeamercolor{palette primary}{bg=ptitblue, fg=white}
+\setbeamercolor{palette secondary}{bg=ptitblue!80, fg=white}
+\setbeamercolor{palette tertiary}{bg=ptitblue!60, fg=white}
+\setbeamercolor{palette quaternary}{bg=ptitblue, fg=white}
+\setbeamercolor{structure}{fg=ptitblue}
+\setbeamercolor{section in toc}{fg=ptitblue}
+\setbeamercolor{block title}{bg=ptitblue, fg=white}
+\setbeamercolor{block body}{bg=lightgray}
+\setbeamercolor{alerted text}{fg=alertred}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{enumerate items}[default]
+
+% Footer
+\setbeamertemplate{footline}{
+  \leavevmode
+  \hbox{
+    \begin{beamercolorbox}[wd=.45\paperwidth,ht=2.25ex,dp=1ex,left,leftskip=2mm]{palette primary}
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[wd=.45\paperwidth,ht=2.25ex,dp=1ex,center]{palette secondary}
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[wd=.1\paperwidth,ht=2.25ex,dp=1ex,right,rightskip=2mm]{palette primary}
+      \usebeamerfont{date in head/foot}\insertframenumber{}/\inserttotalframenumber
+    \end{beamercolorbox}
+  }
+  \vskip0pt
+}
+
+%=============================================================================
+% METADATA
+%=============================================================================
+\title[Cloud-Edge SDN + AI Healthcare]{%
+  Xây dựng Kiến trúc Cloud-Edge Microservices\\
+  Tích hợp SDN và AI cho Hệ thống\\
+  Khám chữa bệnh và Quản lý Y tế Thông minh
+}
+\subtitle{Tiểu luận môn học — Điện toán Đám mây}
+\author[\texorpdfstring{\textcolor{white}{[MSSV — Họ tên]}}{[MSSV - Ho ten]}]{%
+  \textcolor{red}{[Họ và tên sinh viên]}\\
+  \small MSSV: \textcolor{red}{[MSSV]}\\[2pt]
+  \footnotesize Giảng viên hướng dẫn: \textcolor{red}{[Tên GVHD]}
+}
+\institute{\textcolor{red}{[Học viện Công nghệ Bưu chính Viễn thông]}\\
+           \textcolor{red}{[Khoa Viễn thông 1]}}
+\date{Hà Nội, \textcolor{red}{2026}}
+
+%=============================================================================
+% HELPERS
+%=============================================================================
+\newcommand{\cmark}{\textcolor{darkgreen}{\textbf{✓}}}
+\newcommand{\xmark}{\textcolor{alertred}{\textbf{✗}}}
+\newcommand{\arrowitem}{\textcolor{ptitblue}{$\blacktriangleright$}~}
+
+%=============================================================================
+% DOCUMENT
+%=============================================================================
+\begin{document}
+
+% ----------------------------------------------------------------
+% SLIDE 1 — Title
+% ----------------------------------------------------------------
+\begin{frame}
+\titlepage
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 2 — Nội dung trình bày
+% ----------------------------------------------------------------
+\begin{frame}{Nội dung trình bày}
+\tableofcontents[hideallsubsections]
+\end{frame}
+
+\section{Đặt vấn đề \& Mục tiêu}
+
+% ----------------------------------------------------------------
+% SLIDE 3 — Đặt vấn đề
+% ----------------------------------------------------------------
+\begin{frame}{Đặt vấn đề}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{block}{Thực trạng y tế toàn cầu}
+\begin{itemize}
+  \item Hàng triệu ca tử vong có thể phòng ngừa/năm do sự cố thiết bị \textbf{[WHO, 2021]}
+  \item Thiếu giám sát bệnh nhân liên tục 24/7
+  \item Tấn công mạng vào cơ sở y tế gia tăng mạnh
+\end{itemize}
+\end{block}
+
+\column{0.5\textwidth}
+\begin{alertblock}{4 thách thức kỹ thuật cốt lõi}
+\begin{enumerate}
+  \item \textbf{Độ trễ thấp} — cảnh báo $<$ 100 ms
+  \item \textbf{Độ tin cậy cao} — loss $<$ 1\%
+  \item \textbf{Bảo mật} nghiêm ngặt (HIPAA/GDPR)
+  \item \textbf{Mở rộng} hàng nghìn thiết bị
+\end{enumerate}
+\end{alertblock}
+\end{columns}
+
+\vspace{0.4cm}
+\begin{center}
+\textcolor{ptitblue}{\large \textbf{$\Rightarrow$ Cần kiến trúc tích hợp Cloud-Edge + SDN + AI}}
+\end{center}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 4 — Mục tiêu nghiên cứu
+% ----------------------------------------------------------------
+\begin{frame}{Mục tiêu nghiên cứu}
+
+\begin{block}{Phương pháp: Tái kiểm chứng (Backtesting) bài báo}
+\textit{"A Cloud-Edge Microservices Architecture for Smart Healthcare: SDN-Based Medical Asset Management"} — \textbf{IEEE Access, 2021}
+\end{block}
+
+\vspace{0.3cm}
+\textbf{5 mục tiêu cụ thể:}
+\begin{enumerate}
+  \item Triển khai kiến trúc 3 tầng trên môi trường 3 máy ảo VMware
+  \item Kiểm chứng \textbf{AI Autoencoder}: độ chính xác, thời gian suy luận
+  \item Đánh giá \textbf{vòng lặp SDN}: thời gian phản hồi từ phát hiện đến DROP rule
+  \item Kiểm thử \textbf{3 kịch bản bảo mật}: sự cố máy thở, traffic spike, xâm nhập
+  \item \textbf{So sánh} kết quả với chỉ tiêu bài báo gốc
+\end{enumerate}
+
+\end{frame}
+
+\section{Cơ sở lý thuyết}
+
+% ----------------------------------------------------------------
+% SLIDE 5 — SDN
+% ----------------------------------------------------------------
+\begin{frame}{Mạng định nghĩa bằng phần mềm (SDN)}
+
+\begin{columns}[T]
+\column{0.52\textwidth}
+\textbf{Kiến trúc SDN 3 tầng:}
+\begin{tikzpicture}[scale=0.85,
+  box/.style={draw, rounded corners=2pt, minimum width=4.5cm,
+              minimum height=0.7cm, align=center, font=\footnotesize}]
+\node[box, fill=blue!15]   (app)  at (0,0)    {Application Plane (REST API)};
+\node[box, fill=green!15]  (ctrl) at (0,-0.9) {Control Plane (ONOS Controller)};
+\node[box, fill=orange!15] (data) at (0,-1.8) {Data Plane (OVS — OpenFlow 1.3)};
+\draw[-{Stealth},thick] (app.south) -- (ctrl.north);
+\draw[-{Stealth},thick] (ctrl.south) -- (data.north);
+\end{tikzpicture}
+
+\vspace{0.3cm}
+\textbf{ONOS 2.7:} SDN Controller mã nguồn mở, REST API đầy đủ, hỗ trợ cluster
+
+\column{0.45\textwidth}
+\begin{exampleblock}{Ưu điểm với y tế}
+\begin{itemize}
+  \item Lập trình mạng \textbf{động} — không cần can thiệp thủ công
+  \item Push flow rule DROP trong \textbf{mili giây}
+  \item Kiểm soát tập trung toàn mạng
+\end{itemize}
+\end{exampleblock}
+
+\vspace{0.2cm}
+\begin{block}{OpenFlow 1.3}
+Match L2/L3/L4 $\cdot$ Priority $\cdot$ Actions: FORWARD / DROP / CONTROLLER
+\end{block}
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 6 — AI Autoencoder
+% ----------------------------------------------------------------
+\begin{frame}{AI Autoencoder cho phát hiện bất thường ECG}
+
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{Kiến trúc Autoencoder:}
+
+\begin{tikzpicture}[scale=0.8,
+  node/.style={draw, circle, minimum size=0.4cm, fill=ptitblue!20, font=\tiny},
+  arr/.style={-{Stealth}, gray, thin}]
+
+% Input
+\foreach \i in {1,...,4}
+  \node[node] (i\i) at (0, -\i*0.5+1) {};
+% Encoder hidden
+\foreach \i in {1,...,3}
+  \node[node, fill=green!20] (h1\i) at (1.2, -\i*0.5+0.75) {};
+% Latent
+\foreach \i in {1,...,2}
+  \node[node, fill=orange!30] (z\i) at (2.4, -\i*0.5+0.5) {};
+% Decoder hidden
+\foreach \i in {1,...,3}
+  \node[node, fill=green!20] (h2\i) at (3.6, -\i*0.5+0.75) {};
+% Output
+\foreach \i in {1,...,4}
+  \node[node] (o\i) at (4.8, -\i*0.5+1) {};
+
+% Labels
+\node[font=\tiny, below] at (0,-1.2) {Input};
+\node[font=\tiny, below] at (1.2,-1.2) {Encoder};
+\node[font=\tiny, below] at (2.4,-1.2) {Latent \textbf{z}};
+\node[font=\tiny, below] at (3.6,-1.2) {Decoder};
+\node[font=\tiny, below] at (4.8,-1.2) {Output $\hat{x}$};
+
+% Connections (simplified)
+\foreach \i in {1,...,4}
+  \foreach \j in {1,...,3}
+    \draw[arr] (i\i) -- (h1\j);
+\foreach \i in {1,...,3}
+  \foreach \j in {1,...,2}
+    \draw[arr] (h1\i) -- (z\j);
+\foreach \i in {1,...,2}
+  \foreach \j in {1,...,3}
+    \draw[arr] (z\i) -- (h2\j);
+\foreach \i in {1,...,3}
+  \foreach \j in {1,...,4}
+    \draw[arr] (h2\i) -- (o\j);
+\end{tikzpicture}
+
+\column{0.42\textwidth}
+\textbf{Phát hiện bất thường qua MSE:}
+$$\text{MSE} = \frac{1}{n}\sum_{i=1}^{n}(x_i - \hat{x}_i)^2$$
+
+\vspace{0.2cm}
+\begin{tabular}{ll}
+\toprule
+\textbf{MSE} & \textbf{Mức độ} \\
+\midrule
+$\leq$ 1,2093 & Normal \\
+1,2093 – 1,5 & WARNING \\
+$>$ 1,5 & \textcolor{alertred}{\textbf{CRITICAL}} \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.3cm}
+Kiến trúc: $128 \to 64 \to 32 \to 64 \to 128$
+\end{columns}
+
+\end{frame}
+
+\section{Kiến trúc hệ thống}
+
+% ----------------------------------------------------------------
+% SLIDE 7 — Kiến trúc 3 tầng tổng quan
+% ----------------------------------------------------------------
+\begin{frame}{Kiến trúc ba tầng Cloud-Edge SDN + AI}
+
+\begin{center}
+\begin{tikzpicture}[scale=0.9,
+  tier/.style={draw, rounded corners=5pt, minimum width=12cm,
+               minimum height=1.1cm, align=center, font=\small},
+  arr/.style={-{Stealth[scale=1.3]}, thick}]
+
+\node[tier, fill=blue!12] (app) at (0,0)
+  {\textbf{TẦNG ỨNG DỤNG} — Cloud VM 192.168.182.20 (1 vCPU / 2 GB)\\
+   \footnotesize Apache Kafka 3.7.0 (KRaft) · MQTT-Kafka Bridge};
+
+\node[tier, fill=green!12] (ctrl) at (0,-1.6)
+  {\textbf{TẦNG ĐIỀU KHIỂN} — Master VM 192.168.182.10 (2 vCPU / 4 GB)\\
+   \footnotesize K3s Kubernetes · ONOS SDN Controller 2.7};
+
+\node[tier, fill=orange!12] (data) at (0,-3.2)
+  {\textbf{TẦNG DỮ LIỆU} — Edge VM 192.168.182.30 (2 vCPU / 3 GB)\\
+   \footnotesize Open vSwitch · Mosquitto MQTT · ECG Simulator · Autoencoder AI · SDN Agent};
+
+\draw[arr, blue!60] (data.west) to[bend right=30]
+  node[left, font=\footnotesize, text=blue!70]{MQTT-Kafka Bridge} (app.west);
+\draw[arr, green!60!black] (ctrl.south) --
+  node[right, font=\footnotesize]{OpenFlow 1.3} (data.north);
+\draw[arr, gray] (app.south) -- node[right, font=\footnotesize]{REST / Streams} (ctrl.north);
+\end{tikzpicture}
+\end{center}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 8 — Tầng Dữ liệu
+% ----------------------------------------------------------------
+\begin{frame}{Tầng Dữ liệu — Edge VM (5 thành phần)}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{tikzpicture}[scale=0.82,
+  box/.style={draw, rounded corners=2pt, minimum width=4.8cm,
+              minimum height=0.65cm, align=center, font=\footnotesize},
+  arr/.style={-{Stealth}, thick, gray}]
+
+\node[box, fill=yellow!20]   (ecg)   at (0,0)     {ECG Simulator (10 Hz)};
+\node[box, fill=orange!20]   (mqtt)  at (0,-0.85) {Mosquitto MQTT Broker :1883};
+\node[box, fill=green!20]    (ai)    at (0,-1.7)  {Autoencoder Inference Engine};
+\node[box, fill=red!15]      (agent) at (0,-2.55) {SDN Enforcement Agent};
+\node[box, fill=blue!15]     (ovs)   at (0,-3.4)  {Open vSwitch (br0) + OVS};
+
+\draw[arr] (ecg) -- node[right,font=\tiny]{publish ECG} (mqtt);
+\draw[arr] (mqtt) -- node[right,font=\tiny]{subscribe \texttt{healthcare/\#}} (ai);
+\draw[arr] (ai)  -- node[right,font=\tiny]{alert CRITICAL} (agent);
+\draw[arr] (agent) -- node[right,font=\tiny]{REST → ONOS → DROP rule} (ovs);
+\end{tikzpicture}
+
+\column{0.47\textwidth}
+\textbf{Luồng dữ liệu nội bộ Edge:}
+\begin{enumerate}
+  \item ECG Simulator publish JSON lên MQTT mỗi \textbf{100 ms}
+  \item Autoencoder tính MSE, so sánh ngưỡng
+  \item Nếu CRITICAL: SDN Agent gọi \textbf{ONOS REST API}
+  \item OVS nhận flow rule DROP qua \textbf{OpenFlow 1.3}
+\end{enumerate}
+
+\vspace{0.3cm}
+\begin{alertblock}{Bảo mật tầng truy cập}
+Mosquitto: \texttt{allow\_anonymous false}\\
+Chặn 100\% kết nối không có credentials
+\end{alertblock}
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 9 — Vòng lặp bảo mật SDN
+% ----------------------------------------------------------------
+\begin{frame}{Vòng lặp bảo mật SDN — Tự động end-to-end}
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=0.8cm,
+  block/.style={rectangle, draw, rounded corners=3pt, minimum width=8cm,
+                minimum height=0.75cm, align=center, font=\small},
+  arr/.style={-{Stealth[scale=1.2]}, thick}]
+
+\node[block, fill=red!20]     (a1) {Autoencoder phát hiện MSE $>$ 1,5 → CRITICAL};
+\node[block, fill=yellow!20, below=of a1] (a2) {SDN Enforcement Agent nhận MQTT alert};
+\node[block, fill=orange!20, below=of a2] (a3) {HTTP POST → ONOS REST API (\texttt{/onos/v1/flows})};
+\node[block, fill=green!20,  below=of a3] (a4) {ONOS push FLOW\_MOD qua OpenFlow 1.3};
+\node[block, fill=blue!20,   below=of a4] (a5) {OVS br0: priority=40000, actions=\textbf{DROP}};
+
+\draw[arr] (a1) -- node[right, font=\footnotesize]{\textit{MQTT \texttt{healthcare/anomalies}}} (a2);
+\draw[arr] (a2) -- node[right, font=\footnotesize]{\textit{REST call + JSON body}} (a3);
+\draw[arr] (a3) -- node[right, font=\footnotesize]{\textit{HTTP 201 Created}} (a4);
+\draw[arr] (a4) -- node[right, font=\footnotesize]{\textit{TCP 6653 OpenFlow}} (a5);
+
+\node[right=0.3cm of a5, font=\small, text=darkgreen]{\textbf{$\leq$ 35 ms}};
+\end{tikzpicture}
+\end{center}
+
+\end{frame}
+
+\section{Triển khai hệ thống}
+
+% ----------------------------------------------------------------
+% SLIDE 10 — Môi trường thực nghiệm
+% ----------------------------------------------------------------
+\begin{frame}{Môi trường thực nghiệm}
+
+\begin{columns}[T]
+\column{0.52\textwidth}
+\begin{table}
+\caption*{\textbf{Cấu hình 3 máy ảo VMware}}
+\begin{tabular}{llll}
+\toprule
+\textbf{Node} & \textbf{IP} & \textbf{vCPU} & \textbf{RAM} \\
+\midrule
+Master VM & .10 & 2 & 4 GB \\
+Cloud VM  & .20 & 1 & 2 GB \\
+Edge VM   & .30 & 2 & 3 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.3cm}
+\begin{table}
+\caption*{\textbf{Phần mềm chính}}
+\begin{tabular}{ll}
+\toprule
+\textbf{Phần mềm} & \textbf{Phiên bản} \\
+\midrule
+ONOS SDN   & 2.7.0   \\
+Open vSwitch & 2.17.9 \\
+Mosquitto  & 2.0.11  \\
+Kafka      & 3.7.0   \\
+Python     & 3.10    \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\column{0.45\textwidth}
+\begin{exampleblock}{Stack đầy đủ xác nhận}
+\begin{itemize}
+  \item \cmark\ ONOS ↔ OVS qua OpenFlow 1.3
+  \item \cmark\ MQTT auth hoạt động
+  \item \cmark\ Kafka KRaft (không Zookeeper)
+  \item \cmark\ Bridge MQTT → Kafka
+  \item \cmark\ SDN REST API push flows
+\end{itemize}
+\end{exampleblock}
+
+\begin{alertblock}{Hạn chế phần cứng}
+Cloud VM chỉ 1 vCPU / 2 GB RAM\\→ ảnh hưởng ONOS response time
+\end{alertblock}
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 11 — Vấn đề kỹ thuật gặp phải
+% ----------------------------------------------------------------
+\begin{frame}{Các vấn đề kỹ thuật và giải pháp}
+
+\begin{table}
+\caption*{\textbf{8 vấn đề kỹ thuật được ghi nhận và khắc phục}}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{0.25\textwidth}p{0.35\textwidth}p{0.32\textwidth}}
+\toprule
+\textbf{Triệu chứng} & \textbf{Nguyên nhân} & \textbf{Giải pháp} \\
+\midrule
+MQTT anonymous vẫn kết nối & Mosquitto 2.0 cần directive \texttt{listener} tường minh & Thêm \texttt{listener 1883} vào config \\
+ONOS HTTP 400 & Body JSON wrap trong array & Dùng single flow object + \texttt{appId} query param \\
+JSONDecodeError & ONOS 201 trả body rỗng & Try/except quanh \texttt{r.json()} \\
+OVS version error & \texttt{ovs-ofctl} default là OF 1.0 & Thêm flag \texttt{-O OpenFlow13} \\
+Log file trống & Python buffer stdout & Dùng \texttt{python3 -u} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{center}
+\textit{Tài liệu hóa chi tiết — giá trị thực tiễn cho nghiên cứu tương tự}
+\end{center}
+
+\end{frame}
+
+\section{Kết quả thực nghiệm}
+
+% ----------------------------------------------------------------
+% SLIDE 12 — Kết quả AI Inference
+% ----------------------------------------------------------------
+\begin{frame}{Kết quả AI Inference — Autoencoder}
+
+\begin{columns}[T]
+\column{0.52\textwidth}
+\begin{table}
+\caption*{\textbf{Hiệu năng Autoencoder (9.500 mẫu ECG)}}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{llll}
+\toprule
+\textbf{Chỉ số} & \textbf{Thực nghiệm} & \textbf{Bài báo} & \\
+\midrule
+Accuracy         & \textbf{94,0\%}   & 94,5\%  & \cmark \\
+Avg Latency      & \textbf{0,46 ms}  & 35,2 ms & \cmark \\
+Max Latency      & 13,03 ms          & —       & \cmark \\
+Anomaly rate     & 4,8\%             & 5\%     & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\column{0.45\textwidth}
+\begin{exampleblock}{Kết quả nổi bật}
+\textbf{Avg Latency 0,46 ms}\\
+\textcolor{darkgreen}{\textbf{Vượt 76 lần}} so với mục tiêu 35,2 ms
+\end{exampleblock}
+
+\vspace{0.3cm}
+\textbf{Giải thích:}
+\begin{itemize}
+  \item NumPy SIMD tối ưu cho phép tính ma trận 1D nhỏ
+  \item Không cần GPU overhead
+  \item Mô hình nhỏ, fully in-memory
+\end{itemize}
+
+\vspace{0.2cm}
+\textbf{Accuracy $\Delta$ = 0,5\%:}\\
+Data mô phỏng Gaussian vs.\ ECG thực tế
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 13 — Kết quả Kafka Pipeline
+% ----------------------------------------------------------------
+\begin{frame}{Kết quả Pipeline MQTT-Kafka}
+
+\begin{columns}[T]
+\column{0.55\textwidth}
+\begin{table}
+\caption*{\textbf{Hiệu năng MQTT-Kafka Bridge}}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \\
+\midrule
+Throughput     & 80 msg/s        & \cmark \\
+Bridge overhead & \textbf{2,19 ms} & \cmark \\
+P95 interval   & 18,32 ms        & \cmark \\
+Max interval   & 39,28 ms        & \cmark \\
+Message loss   & $\approx$ \textbf{0\%} & \cmark \\
+Total messages & 3.798 (session) & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\column{0.42\textwidth}
+\begin{exampleblock}{Bridge overhead 2,19 ms}
+MQTT callback → JSON parse\\
+→ Kafka produce → ACK\\
+Toàn bộ chỉ \textbf{2,19 ms trên LAN}
+\end{exampleblock}
+
+\vspace{0.3cm}
+\textbf{2 loại message trên Kafka:}
+\begin{itemize}
+  \item ECG telemetry từ \texttt{healthcare/ecg/...}
+  \item Anomaly alerts từ \texttt{healthcare/anomalies}
+\end{itemize}
+Field \texttt{mqtt\_topic} giúp phân biệt nguồn
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 14 — Test 3.1
+% ----------------------------------------------------------------
+\begin{frame}[fragile]{Test 3.1 — Giả lập sự cố máy thở (Ventilator Failure)}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Kịch bản:} Kill ECG Simulator → giả lập mất kết nối thiết bị → AI phát hiện MSE đột biến → SDN push DROP rule
+
+\vspace{0.3cm}
+\begin{table}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \\
+\midrule
+SDN RT (avg) & \textbf{24,59 ms} & \cmark \\
+SDN RT (max) & 49,16 ms & — \\
+Flow rules pushed & 40 & \cmark \\
+API errors & 0 & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\column{0.47\textwidth}
+\begin{exampleblock}{Mục tiêu bài báo: $\leq$ 35 ms}
+\textcolor{darkgreen}{\textbf{24,59 ms} — Đạt (tốt hơn 29\%)}
+\end{exampleblock}
+
+\vspace{0.3cm}
+\textbf{Xác nhận OVS:}
+\begin{footnotesize}
+\begin{verbatim}
+cookie=0xae000...,
+priority=40000,
+actions=drop
+\end{verbatim}
+\end{footnotesize}
+
+\vspace{0.2cm}
+Flow rule DROP được áp dụng ngay tại kernel OVS — \textbf{không cần can thiệp thủ công}
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 15 — Test 3.2
+% ----------------------------------------------------------------
+\begin{frame}{Test 3.2 — ECG Traffic Spike (1.000 messages)}
+
+\begin{columns}[T]
+\column{0.52\textwidth}
+\textbf{Kịch bản:} Flood 1.000 MQTT msg với \texttt{value=2.5, anomaly=true} trong burst ngắn → kiểm tra tải cao
+
+\vspace{0.3cm}
+\begin{table}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \\
+\midrule
+Messages received & 1.000 / 1.000 & \cmark \\
+Message loss & \textbf{0} & \cmark \\
+MQTT Throughput & \textbf{3.890,8 msg/s} & \cmark \\
+MSE trong spike & 2,2894 CRITICAL & \cmark \\
+SDN RT (avg) & \textbf{15,76 ms} & \cmark \\
+SDN RT (max) & 103,68 ms & — \\
+API errors & 0 & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\column{0.45\textwidth}
+\begin{exampleblock}{Mục tiêu: $\leq$ 42 ms}
+\textcolor{darkgreen}{\textbf{15,76 ms} — Vượt (nhanh hơn 2,7 lần)}
+\end{exampleblock}
+
+\begin{exampleblock}{MQTT Throughput}
+\textbf{3.890,8 msg/s} trên VM 2 vCPU\\
+— Mosquitto xử lý tải cao xuất sắc
+\end{exampleblock}
+
+\vspace{0.2cm}
+\textit{Max 103,68 ms: ONOS queue nhiều rules đồng thời — bình thường, cơ chế vẫn đúng}
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 16 — Test 3.3
+% ----------------------------------------------------------------
+\begin{frame}{Test 3.3 — Security Breach}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Test 3.3a — MQTT Unauthorized Access:}
+\begin{itemize}
+  \item 5 lần thử kết nối MQTT với credentials sai
+  \item \textcolor{darkgreen}{\textbf{5/5 bị chặn}} → Block rate \textbf{100\%}
+  \item Phản hồi: \texttt{MQTT rc=5: Not authorized}
+\end{itemize}
+
+\vspace{0.4cm}
+\textbf{Test 3.3b — SYN Flood (hping3):}
+\begin{itemize}
+  \item Flood port 1883 từ WSL trong 10 giây
+  \item SSH vào Edge VM bị \textbf{timeout} — flood thực sự bão hòa target
+  \item Sau flood: inject manual CRITICAL alert
+\end{itemize}
+
+\column{0.47\textwidth}
+\begin{table}
+\caption*{\textbf{SDN Enforcement sau breach}}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \\
+\midrule
+MSE inject & 2,5 (CRITICAL) & \cmark \\
+ONOS RT & 56,40 ms & $\sim$* \\
+DROP rule & priority=40000 & \cmark \\
+OVS flows & 4 (+1 baseline) & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{footnotesize}
+\textit{* 56,40 ms $>$ 35 ms do overhead REST API sau SYN flood trên 2-vCPU VM. Cơ chế enforcement hoạt động đúng.}
+\end{footnotesize}
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 17 — So sánh tổng hợp
+% ----------------------------------------------------------------
+\begin{frame}{So sánh tổng hợp với bài báo gốc}
+
+\begin{table}
+\caption*{\textbf{Paper Verification Results}}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{lllll}
+\toprule
+\textbf{Chỉ số} & \textbf{Bài báo} & \textbf{Thực nghiệm} & \textbf{Tỷ lệ} & \textbf{Kết luận} \\
+\midrule
+AI Accuracy         & 94,5\%    & 94,0\%      & 99,5\%   & \cmark\ Xấp xỉ \\
+AI Avg Latency      & 35,2 ms   & 0,46 ms     & Vượt 76x & \cmark\ Vượt \\
+SDN RT (Ventilator) & $\leq$35 ms & 24,59 ms  & 70\%     & \cmark\ Đạt \\
+SDN RT (Spike)      & $\leq$42 ms & 15,76 ms  & 37\%     & \cmark\ Đạt \\
+MQTT Block Rate     & 100\%     & \textbf{100\%} & 100\% & \cmark\ Đạt \\
+Message Loss        & $<$5\%    & $\approx$0\% & Vượt   & \cmark\ Đạt \\
+\midrule
+\multicolumn{4}{l}{\textbf{Tổng hợp}} & \textcolor{darkgreen}{\textbf{5/6 đạt, 1/6 xấp xỉ}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{frame}
+
+\section{Kết luận}
+
+% ----------------------------------------------------------------
+% SLIDE 18 — Kết quả đạt được
+% ----------------------------------------------------------------
+\begin{frame}{Kết quả đạt được}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{exampleblock}{5 đóng góp chính}
+\begin{enumerate}
+  \item \cmark\ Triển khai thực nghiệm 3-VM hoàn chỉnh
+  \item \cmark\ AI Accuracy 94,0\% — latency 0,46 ms
+  \item \cmark\ SDN phản hồi 15,76–24,59 ms
+  \item \cmark\ MQTT chặn 100\% kết nối rogue
+  \item \cmark\ Kafka pipeline: 0\% message loss
+\end{enumerate}
+\end{exampleblock}
+
+\column{0.47\textwidth}
+\begin{alertblock}{Hạn chế}
+\begin{itemize}
+  \item Dữ liệu ECG mô phỏng (Gaussian), không phải lâm sàng
+  \item ONOS RT vượt 35 ms tại tải cao sau SYN flood
+  \item Chưa có module phát hiện SYN flood tự động
+  \item Chỉ kiểm thử với 1 bệnh nhân (patient001)
+\end{itemize}
+\end{alertblock}
+\end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 19 — Hướng phát triển
+% ----------------------------------------------------------------
+\begin{frame}{Hướng phát triển}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Ngắn hạn:}
+\begin{itemize}
+  \item Tích hợp dữ liệu ECG thực từ MIT-BIH Arrhythmia Database
+  \item Tích hợp NIDS (Snort/Suricata) vào vòng lặp SDN để phát hiện SYN flood tự động
+  \item Kiểm thử scalability: 10, 50, 100 bệnh nhân đồng thời
+\end{itemize}
+
+\column{0.47\textwidth}
+\textbf{Dài hạn:}
+\begin{itemize}
+  \item Triển khai phần cứng vật lý (Raspberry Pi Edge)
+  \item \textbf{Federated Learning} — bảo vệ quyền riêng tư bệnh nhân theo GDPR/HIPAA
+  \item Tích hợp hệ thống thông tin bệnh viện (HIS) thực tế
+  \item Bổ sung audit trail đầy đủ cho SDN flow rules (yêu cầu pháp lý)
+\end{itemize}
+\end{columns}
+
+\vspace{0.4cm}
+\begin{center}
+\textcolor{ptitblue}{\textbf{Kiến trúc đề xuất xác nhận tính khả thi và là nền tảng cho các nghiên cứu mở rộng}}
+\end{center}
+
+\end{frame}
+
+% ----------------------------------------------------------------
+% SLIDE 20 — Thank you / Q&A
+% ----------------------------------------------------------------
+\begin{frame}
+
+\begin{center}
+\vspace{0.5cm}
+{\Large \textbf{CẢM ƠN QUÝ THẦY CÔ VÀ CÁC BẠN ĐÃ LẮNG NGHE}}
+
+\vspace{1cm}
+\rule{0.6\textwidth}{0.5pt}
+\vspace{0.5cm}
+
+\begin{columns}[c]
+\column{0.5\textwidth}
+\centering
+\textbf{Tóm tắt kết quả:}
+\begin{itemize}
+  \item AI Latency: \textcolor{darkgreen}{\textbf{0,46 ms}} (vượt 76×)
+  \item SDN RT: \textcolor{darkgreen}{\textbf{15,76 ms}} (tải cao)
+  \item Block rate: \textcolor{darkgreen}{\textbf{100\%}}
+  \item Message loss: \textcolor{darkgreen}{\textbf{$\approx$0\%}}
+\end{itemize}
+
+\column{0.45\textwidth}
+\centering
+\textbf{Sinh viên thực hiện:}\\[0.3cm]
+\textcolor{red}{[Họ và tên]}\\
+\textcolor{red}{[MSSV]}\\[0.3cm]
+\textbf{GVHD:}\\
+\textcolor{red}{[Tên giảng viên]}
+\end{columns}
+
+\vspace{0.8cm}
+{\large \textcolor{ptitblue}{\textbf{Kính mời Quý thầy cô đặt câu hỏi}}}
+\end{center}
+
+\end{frame}
+
+\end{document}

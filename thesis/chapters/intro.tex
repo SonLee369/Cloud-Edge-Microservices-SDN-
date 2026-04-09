@@ -1,0 +1,58 @@
+\phantomsection
+\addcontentsline{toc}{chapter}{MỞ ĐẦU}
+\chapter*{MỞ ĐẦU}
+
+\section*{1. Tính cấp thiết của đề tài}
+
+Trong bối cảnh dân số toàn cầu ngày càng già hóa và gánh nặng bệnh tật gia tăng mạnh mẽ, hệ thống y tế truyền thống đang phải đối mặt với nhiều áp lực nghiêm trọng: thiếu nhân lực y tế, quản lý tài sản thiết bị kém hiệu quả và khả năng giám sát bệnh nhân liên tục còn nhiều hạn chế. Theo báo cáo của Tổ chức Y tế Thế giới (WHO), mỗi năm có hàng triệu trường hợp tử vong có thể phòng ngừa liên quan đến sự cố y tế do lỗi thiết bị hoặc chậm trễ trong phát hiện tình trạng khẩn cấp~\cite{who2021}. Thực trạng này đặt ra yêu cầu cấp thiết xây dựng các hệ thống y tế thông minh có khả năng giám sát, phân tích và phản hồi theo thời gian thực.
+
+Sự hội tụ của Internet of Things (IoT), điện toán biên (Edge Computing), điện toán đám mây (Cloud Computing) và trí tuệ nhân tạo (AI) mở ra cơ hội chưa từng có để xây dựng hệ thống chăm sóc sức khỏe tự động hóa cao. Trong đó, kiến trúc Cloud-Edge Microservices nổi lên như một giải pháp triển vọng: xử lý dữ liệu nhạy cảm về thời gian ngay tại biên mạng, đồng thời tận dụng khả năng lưu trữ và phân tích của đám mây cho dữ liệu dài hạn.
+
+Tuy nhiên, một thách thức then chốt trong các hệ thống y tế thông minh là vấn đề bảo mật mạng. Các thiết bị IoT y tế thường có khả năng bảo mật hạn chế, trong khi dữ liệu bệnh nhân là đối tượng nhắm mục tiêu của nhiều cuộc tấn công mạng ngày càng tinh vi~\cite{kruse2017cybersecurity}. Mạng định nghĩa bằng phần mềm (SDN) cung cấp một cơ chế kiểm soát mạng lập trình được, cho phép tự động hóa phản ứng bảo mật theo thời gian thực — điều mà các giải pháp tường lửa tĩnh truyền thống không thể thực hiện được.
+
+Bài báo \textit{"A Cloud-Edge Microservices Architecture for Smart Healthcare: SDN-Based Medical Asset Management"}~\cite{paper_main} đề xuất một kiến trúc tích hợp đầy đủ ba thành phần: Cloud-Edge Microservices, SDN và AI trong một hệ thống thống nhất dành cho quản lý y tế thông minh. Bài báo tuyên bố đạt độ chính xác nhận biết bất thường 94,5\%, thời gian phản hồi SDN dưới 35 ms và khả năng chặn 100\% kết nối trái phép. Việc tái kiểm chứng độc lập các tuyên bố này qua thực nghiệm là hoạt động khoa học cần thiết để đánh giá tính khả thi và mức độ áp dụng thực tiễn của kiến trúc đề xuất.
+
+\section*{2. Mục tiêu nghiên cứu}
+
+Luận văn hướng đến các mục tiêu cụ thể sau:
+
+\begin{itemize}
+    \item Triển khai thực nghiệm kiến trúc Cloud-Edge Microservices tích hợp SDN và AI trên môi trường ba máy ảo VMware.
+    \item Kiểm chứng hiệu năng Autoencoder trong phát hiện bất thường tín hiệu ECG: độ chính xác, độ trễ suy luận và ngưỡng MSE.
+    \item Đánh giá tốc độ phản hồi của vòng lặp bảo mật SDN, từ khi phát hiện bất thường đến khi OVS áp dụng flow rule DROP.
+    \item Kiểm thử ba kịch bản bảo mật: giả lập sự cố máy thở, flood ECG traffic và tấn công xâm nhập mạng.
+    \item So sánh kết quả thực nghiệm với các chỉ tiêu trong bài báo gốc, đánh giá mức độ đạt được trong điều kiện hạ tầng hạn chế.
+\end{itemize}
+
+\section*{3. Đối tượng và phạm vi nghiên cứu}
+
+\textbf{Đối tượng nghiên cứu:} Kiến trúc hệ thống Cloud-Edge Microservices tích hợp SDN và AI cho giám sát bệnh nhân và quản lý tài sản y tế thông minh.
+
+\textbf{Phạm vi nghiên cứu:}
+\begin{itemize}
+    \item \textit{Phần cứng:} Ba máy ảo Linux Ubuntu Server 22.04 LTS, kết nối qua mạng nội bộ VMware (192.168.182.0/24).
+    \item \textit{Phần mềm:} ONOS 2.7, Open vSwitch 2.17.9, Mosquitto MQTT 2.0.11, Apache Kafka 3.7.0 (KRaft), Python 3.10.
+    \item \textit{Dữ liệu:} Tín hiệu ECG mô phỏng dựa trên phân phối Gaussian với tỷ lệ bất thường 5\%.
+    \item \textit{Ngoài phạm vi:} Triển khai trên phần cứng vật lý chuyên dụng, tích hợp với hệ thống thông tin bệnh viện (HIS) thực tế.
+\end{itemize}
+
+\section*{4. Phương pháp nghiên cứu}
+
+Luận văn sử dụng kết hợp hai phương pháp chính:
+
+\begin{itemize}
+    \item \textbf{Nghiên cứu tài liệu:} Phân tích bài báo gốc và khảo sát các công trình liên quan về SDN, Cloud-Edge Computing, AI trong y tế, giao thức MQTT và Kafka.
+    \item \textbf{Thực nghiệm:} Xây dựng môi trường lab 3-VM, triển khai đầy đủ stack phần mềm, thực hiện các bài kiểm thử có kiểm soát với điều kiện đầu vào xác định, thu thập và phân tích dữ liệu đo lường, đối chiếu với mục tiêu bài báo.
+\end{itemize}
+
+\section*{5. Bố cục luận văn}
+
+Ngoài phần Mở đầu và Kết luận, luận văn được tổ chức thành bốn chương chính:
+
+\begin{itemize}
+    \item \textbf{Chương 1 — Cơ sở lý thuyết và tổng quan:} Trình bày các khái niệm nền tảng về Smart Healthcare, Cloud-Edge Computing, SDN, AI Autoencoder và các công nghệ hỗ trợ (MQTT, Kafka, OVS); khảo sát các công trình liên quan.
+    \item \textbf{Chương 2 — Kiến trúc hệ thống đề xuất:} Mô tả chi tiết kiến trúc ba tầng, vai trò từng thành phần và thiết kế vòng lặp bảo mật SDN tự động.
+    \item \textbf{Chương 3 — Triển khai và cấu hình hệ thống:} Trình bày quy trình cài đặt, cấu hình và các vấn đề kỹ thuật gặp phải cùng giải pháp khắc phục.
+    \item \textbf{Chương 4 — Kết quả thực nghiệm và đánh giá:} Trình bày và phân tích kết quả đo lường từ ba kịch bản kiểm thử, so sánh với bài báo gốc.
+\end{itemize}
+\newpage

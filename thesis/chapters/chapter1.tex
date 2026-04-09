@@ -1,0 +1,137 @@
+\chapter{CƠ SỞ LÝ THUYẾT VÀ TỔNG QUAN}
+
+\section{Hệ thống y tế thông minh và những thách thức hiện tại}
+
+Hệ thống y tế thông minh (Smart Healthcare) là mô hình chăm sóc sức khỏe ứng dụng tích hợp công nghệ thông tin, IoT, dữ liệu lớn và trí tuệ nhân tạo để nâng cao chất lượng điều trị, tối ưu hóa quản lý tài nguyên và giảm thiểu sai sót y khoa. Theo Topol~\cite{topol2019}, ứng dụng AI trong y tế có thể cải thiện độ chính xác chẩn đoán lên đến 30\% so với phương pháp truyền thống, đồng thời giảm đáng kể chi phí vận hành.
+
+Tuy nhiên, hệ thống y tế thông minh đối mặt với nhiều thách thức kỹ thuật đặc thù:
+
+\begin{itemize}
+    \item \textbf{Yêu cầu độ trễ thấp:} Cảnh báo các tình trạng nguy kịch như ngừng tim, suy hô hấp hay rối loạn nhịp tim phải được xử lý và phản hồi trong vòng hàng chục mili giây~\cite{shi2016edge}. Bất kỳ độ trễ nào lớn hơn 100 ms đều có thể dẫn đến hậu quả nghiêm trọng trong cấp cứu.
+    \item \textbf{Độ tin cậy và tính liên tục:} Hệ thống không được phép mất dữ liệu hoặc ngừng hoạt động trong quá trình truyền tải thông tin bệnh nhân. Tỷ lệ mất gói phải được duy trì ở mức dưới 1\%.
+    \item \textbf{Bảo mật và quyền riêng tư:} Dữ liệu y tế là dữ liệu đặc biệt nhạy cảm được bảo vệ bởi các quy định như HIPAA (Mỹ) và GDPR (Châu Âu). Các cuộc tấn công mạng nhắm vào cơ sở hạ tầng y tế ngày càng gia tăng, gây thiệt hại nghiêm trọng~\cite{kruse2017cybersecurity}.
+    \item \textbf{Khả năng mở rộng:} Một bệnh viện quy mô lớn có thể vận hành hàng nghìn thiết bị giám sát đồng thời, đòi hỏi hạ tầng mạng và xử lý có khả năng scale linh hoạt.
+\end{itemize}
+
+Những thách thức này thúc đẩy sự ra đời của kiến trúc Cloud-Edge Microservices — một mô hình xử lý phân tán trong đó các tác vụ nhạy cảm về thời gian được thực hiện ngay tại Edge, còn tác vụ phân tích dài hạn được xử lý trên Cloud.
+
+\section{Điện toán biên và đám mây trong y tế}
+
+\subsection{Điện toán biên (Edge Computing)}
+
+Điện toán biên (Edge Computing) là mô hình xử lý dữ liệu tại hoặc gần nguồn phát sinh, thay vì chuyển toàn bộ dữ liệu lên trung tâm dữ liệu đám mây. Shi và cộng sự~\cite{shi2016edge} định nghĩa Edge Computing là mở rộng của dịch vụ đám mây xuống gần với người dùng cuối, với đặc điểm nổi bật là:
+
+\begin{itemize}
+    \item Độ trễ thấp (dưới 10 ms) so với Cloud (100–200 ms).
+    \item Tiết kiệm băng thông đường truyền lên Cloud.
+    \item Xử lý offline khi mất kết nối Cloud.
+    \item Bảo mật dữ liệu nhạy cảm tại chỗ, không cần gửi lên đám mây.
+\end{itemize}
+
+Trong bối cảnh y tế, Edge Computing cho phép phân tích tín hiệu sinh lý (ECG, SpO\textsubscript{2}, huyết áp) ngay tại giường bệnh, đưa ra cảnh báo tức thì mà không phụ thuộc vào kết nối mạng WAN.
+
+\subsection{Kiến trúc Microservices}
+
+Microservices là kiến trúc phần mềm trong đó ứng dụng được cấu thành từ các dịch vụ nhỏ, độc lập, mỗi dịch vụ có vòng đời triển khai riêng và giao tiếp qua API~\cite{newman2015microservices}. Đối với hệ thống y tế, microservices mang lại:
+
+\begin{itemize}
+    \item Khả năng cập nhật từng module độc lập mà không ảnh hưởng toàn hệ thống.
+    \item Cô lập lỗi: một service gặp sự cố không làm sập toàn bộ hệ thống.
+    \item Scale theo chiều ngang (horizontal scaling) cho từng service theo nhu cầu thực tế.
+\end{itemize}
+
+\section{Mạng định nghĩa bằng phần mềm (SDN)}
+
+\subsection{Kiến trúc tổng quan SDN}
+
+Software Defined Networking (SDN) là kiến trúc mạng tách biệt hoàn toàn tầng điều khiển (control plane) khỏi tầng dữ liệu (data plane)~\cite{mckeown2008openflow}. Điểm khác biệt căn bản với mạng truyền thống là:
+
+\begin{itemize}
+    \item \textbf{Data Plane:} Các switch/router chỉ thực hiện chuyển tiếp gói tin theo bảng flow rules được nạp từ Controller, không có logic điều khiển độc lập.
+    \item \textbf{Control Plane:} SDN Controller là thực thể tập trung đưa ra quyết định định tuyến, áp dụng chính sách QoS và bảo mật, sau đó nạp flow rules xuống các thiết bị mạng.
+    \item \textbf{Application Plane:} Các ứng dụng SDN (load balancer, firewall động, network slicing) giao tiếp với Controller qua Northbound API (thường là REST API).
+\end{itemize}
+
+Ưu điểm nổi bật nhất của SDN trong ứng dụng y tế là khả năng lập trình mạng động: Controller có thể thay đổi hành vi toàn bộ mạng thông qua REST API mà không cần can thiệp thủ công vào từng thiết bị — điều tối quan trọng khi cần phản hồi tấn công bảo mật trong mili giây.
+
+\subsection{Giao thức OpenFlow}
+
+OpenFlow là giao thức chuẩn hóa kênh truyền thông giữa SDN Controller và Switch~\cite{mckeown2008openflow}. Phiên bản OpenFlow 1.3 được sử dụng trong luận văn hỗ trợ các tính năng:
+
+\begin{itemize}
+    \item Match đa trường header: địa chỉ MAC (L2), địa chỉ IP (L3), cổng TCP/UDP (L4).
+    \item Pipeline xử lý đa bảng (multiple flow tables) theo thứ tự ưu tiên.
+    \item Meters cho kiểm soát tốc độ (rate limiting).
+    \item Group tables cho xử lý multicast và fast failover.
+\end{itemize}
+
+Mỗi flow rule trong OpenFlow gồm ba thành phần: \textit{match fields} (điều kiện đối chiếu gói tin), \textit{priority} (độ ưu tiên, giá trị cao hơn được xét trước) và \textit{instructions/actions} (hành động thực hiện: FORWARD, DROP, CONTROLLER...).
+
+\subsection{ONOS SDN Controller}
+
+Open Network Operating System (ONOS) là SDN Controller mã nguồn mở được thiết kế cho môi trường sản xuất với yêu cầu high availability~\cite{berde2014onos}. ONOS nổi bật với:
+
+\begin{itemize}
+    \item Kiến trúc phân tán: hỗ trợ cluster controller cho fault tolerance.
+    \item REST API đầy đủ: quản lý flows, devices, hosts, topology, intents.
+    \item Hỗ trợ nhiều giao thức phía Nam (Southbound): OpenFlow 1.0/1.3, P4, gRPC, NETCONF.
+    \item Web GUI tích hợp để giám sát và quản lý trực quan.
+\end{itemize}
+
+\section{Trí tuệ nhân tạo trong phát hiện bất thường y tế}
+
+\subsection{Mạng nơ-ron Autoencoder}
+
+Autoencoder là kiến trúc mạng nơ-ron tự giám sát (self-supervised) được sử dụng rộng rãi cho bài toán phát hiện bất thường~\cite{chandola2009anomaly}. Cấu trúc gồm hai phần đối xứng:
+
+\begin{itemize}
+    \item \textbf{Encoder} $f$: nén input $\mathbf{x} \in \mathbb{R}^n$ thành biểu diễn chiều thấp $\mathbf{z} = f(\mathbf{x}) \in \mathbb{R}^k$, với $k \ll n$ (latent representation).
+    \item \textbf{Decoder} $g$: tái tạo lại input từ biểu diễn nén $\hat{\mathbf{x}} = g(\mathbf{z}) \in \mathbb{R}^n$.
+\end{itemize}
+
+Mạng được huấn luyện tối thiểu hóa lỗi tái tạo trên dữ liệu bình thường. Hàm mất mát:
+\begin{equation}
+    \mathcal{L} = \frac{1}{N} \sum_{i=1}^{N} \left\| \mathbf{x}_i - g\!\left(f(\mathbf{x}_i)\right) \right\|^2
+    \label{eq:loss}
+\end{equation}
+
+Khi gặp dữ liệu bất thường (ngoài phân phối huấn luyện), Decoder không thể tái tạo chính xác, dẫn đến lỗi tái tạo cao — đây là cơ sở phát hiện bất thường.
+
+\subsection{Phát hiện bất thường ECG dựa trên MSE}
+
+Tín hiệu điện tâm đồ (ECG) mang thông tin về nhịp tim, dẫn truyền điện và tình trạng tim mạch. Autoencoder huấn luyện trên chuỗi ECG bình thường sẽ tái tạo tốt tín hiệu bình thường (MSE thấp) và tái tạo kém tín hiệu bất thường như rối loạn nhịp, thiếu máu cơ tim (MSE cao).
+
+Chỉ số Mean Squared Error được tính theo công thức:
+\begin{equation}
+    \text{MSE}(\mathbf{x}, \hat{\mathbf{x}}) = \frac{1}{n} \sum_{i=1}^{n} (x_i - \hat{x}_i)^2
+    \label{eq:mse}
+\end{equation}
+
+Ngưỡng phát hiện $\theta$ được xác định từ phân phối MSE trên tập validation: nếu $\text{MSE} > \theta$, mẫu được phân loại là bất thường. Trong hệ thống này, sử dụng hai mức ngưỡng: $\theta_{\text{warn}} = 1{,}2093$ và $\theta_{\text{crit}} = 1{,}5$.
+
+\section{Các công nghệ hỗ trợ}
+
+\subsection{Giao thức MQTT}
+
+MQTT (Message Queuing Telemetry Transport) là giao thức nhắn tin nhẹ theo mô hình publish/subscribe, được chuẩn hóa bởi OASIS~\cite{mqtt_spec} và thiết kế đặc biệt cho môi trường IoT băng thông thấp. Các đặc điểm phù hợp với y tế:
+
+\begin{itemize}
+    \item Ba mức QoS: 0 (at most once), 1 (at least once), 2 (exactly once) — đảm bảo giao nhận tin nhắn quan trọng.
+    \item Last Will and Testament (LWT): tự động phát hiện thiết bị ngắt kết nối đột ngột.
+    \item Retained messages: lưu trạng thái thiết bị mới nhất, client kết nối muộn vẫn nhận được.
+    \item Overhead thấp: header MQTT chỉ 2 byte, phù hợp cảm biến pin.
+\end{itemize}
+
+\subsection{Apache Kafka}
+
+Apache Kafka là nền tảng streaming phân tán với khả năng xử lý hàng triệu messages mỗi giây~\cite{kreps2011kafka}. Kafka sử dụng kiến trúc log-based với lưu trữ bền vững (durable), đảm bảo thứ tự trong partition và hỗ trợ replay dữ liệu lịch sử. Với phiên bản 3.7.0 chế độ KRaft (không cần Zookeeper), Kafka đơn giản hóa đáng kể việc triển khai và vận hành.
+
+\subsection{Open vSwitch}
+
+Open vSwitch (OVS) là switch ảo phần mềm mã nguồn mở hỗ trợ OpenFlow, được tối ưu cho môi trường ảo hóa và container~\cite{pfaff2015ovs}. OVS xử lý lưu lượng mạng tại kernel space cho hiệu năng cao, đồng thời cung cấp giao diện quản lý qua \texttt{ovs-vsctl} (cấu hình) và \texttt{ovs-ofctl} (quản lý flow rules trực tiếp).
+
+\section{Các nghiên cứu liên quan}
+
+Nhiều công trình nghiên cứu đã khám phá ứng dụng SDN và Edge Computing trong lĩnh vực y tế. Yousefpour và cộng sự~\cite{yousefpour2019fog} đề xuất kiến trúc Fog Computing cho IoT y tế với khả năng giảm độ trễ đáng kể, tuy nhiên chưa tích hợp SDN để kiểm soát mạng động. Aujla và cộng sự~\cite{aujla2020sdn} kết hợp SDN với mô hình bảo mật nhiều lớp cho hệ thống IoT y tế, nhưng không xem xét AI inference tại Edge và pipeline dữ liệu end-to-end.
+
+Công trình gần nhất và trực tiếp liên quan là bài báo của Dautov và cộng sự~\cite{paper_main} — công trình mà luận văn này thực hiện tái kiểm chứng. Điểm khác biệt và đóng góp của luận văn so với các công trình đã có là việc xác nhận thực nghiệm độc lập kiến trúc tích hợp đầy đủ cả ba thành phần (Cloud-Edge Microservices + SDN + AI) trong điều kiện phần cứng hạn chế thực tế, cung cấp dữ liệu đo lường cụ thể và phân tích các vấn đề kỹ thuật gặp phải trong quá trình triển khai.

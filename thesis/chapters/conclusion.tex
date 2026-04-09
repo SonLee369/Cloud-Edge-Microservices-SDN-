@@ -1,0 +1,45 @@
+\phantomsection
+\addcontentsline{toc}{chapter}{KẾT LUẬN VÀ KIẾN NGHỊ}
+\chapter*{KẾT LUẬN VÀ KIẾN NGHỊ}
+
+\section*{1. Kết quả đạt được}
+
+Luận văn đã hoàn thành việc tái kiểm chứng thực nghiệm kiến trúc Cloud-Edge Microservices tích hợp SDN và AI cho hệ thống y tế thông minh theo bài báo \textit{"A Cloud-Edge Microservices Architecture for Smart Healthcare: SDN-Based Medical Asset Management"}~\cite{paper_main}. Các đóng góp chính gồm:
+
+\textbf{1. Triển khai thực nghiệm hoàn chỉnh:} Xây dựng thành công môi trường 3-VM với đầy đủ stack phần mềm: ONOS SDN Controller, Open vSwitch, Mosquitto MQTT, Apache Kafka và Autoencoder AI, hoạt động liên thông theo kiến trúc bài báo. Tài liệu hóa chi tiết 8 vấn đề kỹ thuật gặp phải và giải pháp khắc phục — giá trị thực tiễn quan trọng cho các nghiên cứu tương tự.
+
+\textbf{2. Xác nhận hiệu năng AI Inference:} Autoencoder đạt độ chính xác 94,0\% (xấp xỉ mục tiêu 94,5\%) với thời gian suy luận trung bình 0,46 ms — vượt 76 lần mục tiêu bài báo. Kết quả này xác nhận Autoencoder là kiến trúc AI phù hợp cho phát hiện bất thường thời gian thực tại Edge với tài nguyên phần cứng hạn chế.
+
+\textbf{3. Xác nhận vòng lặp bảo mật SDN:} Toàn bộ chuỗi tự động (Anomaly Alert → ONOS REST API → OpenFlow FLOW\_MOD → OVS DROP rule) hoạt động end-to-end với thời gian phản hồi trung bình 15,76–24,59 ms trong hai kịch bản chính — đạt mục tiêu phản hồi thời gian thực của bài báo.
+
+\textbf{4. Xác nhận bảo mật MQTT:} Mosquitto 2.0.11 với \texttt{allow\_anonymous false} chặn 100\% kết nối rogue không có credentials — đạt yêu cầu bảo vệ tầng truy cập IoT.
+
+\textbf{5. Xác nhận pipeline dữ liệu:} MQTT-Kafka Bridge đạt throughput 80 msg/s với overhead 2,19 ms và tỷ lệ mất gói $\approx$0\% — đảm bảo toàn vẹn dữ liệu telemetry từ Edge đến Cloud.
+
+\section*{2. Hạn chế}
+
+\begin{itemize}
+    \item \textbf{Dữ liệu ECG mô phỏng:} Dữ liệu Gaussian không phản ánh đầy đủ đa dạng tín hiệu ECG bệnh nhân thực tế, dẫn đến độ chính xác AI thấp hơn bài báo 0,5\%.
+
+    \item \textbf{Phần cứng VM giới hạn:} ONOS Response Time 56,40 ms (vượt ngưỡng 35 ms) tại kịch bản tải cao sau SYN flood phản ánh giới hạn 2-vCPU VM. Phần cứng vật lý chuyên dụng sẽ cải thiện đáng kể.
+
+    \item \textbf{Thiếu module phát hiện xâm nhập mạng:} SDN Enforcement Agent phản hồi theo MSE threshold từ Autoencoder, không tự động phát hiện SYN flood ở tầng L3/L4. Cần thêm Network Intrusion Detection System (NIDS) tích hợp.
+
+    \item \textbf{Chưa kiểm thử quy mô lớn:} Thực nghiệm với một bệnh nhân (patient001). Chưa đánh giá scalability với 10, 50 hay 100 thiết bị đồng thời.
+\end{itemize}
+
+\section*{3. Hướng phát triển}
+
+\begin{itemize}
+    \item Tích hợp dữ liệu ECG thực từ bộ dữ liệu MIT-BIH Arrhythmia Database hoặc thiết bị y tế được chứng nhận FDA/CE để đánh giá độ chính xác AI trên dữ liệu lâm sàng thực tế.
+
+    \item Triển khai module Network Intrusion Detection (Snort/Suricata) tích hợp vào vòng lặp SDN để tự động phát hiện và phản hồi SYN flood, DDoS và port scanning.
+
+    \item Mở rộng thực nghiệm scalability: tăng số lượng bệnh nhân giám sát đồng thời lên 10, 50, 100 để xác định điểm bão hòa của hệ thống.
+
+    \item Triển khai trên phần cứng vật lý (Raspberry Pi 4 làm Edge node, server vật lý làm Master) để đo hiệu năng trong điều kiện thực tế hơn.
+
+    \item Nghiên cứu Federated Learning để huấn luyện mô hình AI phân tán, bảo vệ quyền riêng tư dữ liệu bệnh nhân theo quy định GDPR và HIPAA.
+
+    \item Bổ sung cơ chế logging và audit trail đầy đủ cho tất cả flow rules SDN, đáp ứng yêu cầu tuân thủ pháp lý và kiểm toán trong môi trường y tế thực tế.
+\end{itemize}

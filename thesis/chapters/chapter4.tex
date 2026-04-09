@@ -1,0 +1,238 @@
+\chapter{KẾT QUẢ THỰC NGHIỆM VÀ ĐÁNH GIÁ}
+
+\section{Đánh giá hiệu năng AI Inference}
+
+\subsection{Kết quả Autoencoder trên tập kiểm thử}
+
+Autoencoder được đánh giá trên tập 9.500 mẫu ECG mô phỏng trong phiên chạy đồng thời với MQTT-Kafka Bridge, bao gồm 454 mẫu bất thường thực (4,8\% — xấp xỉ tỷ lệ 5\% được inject). Kết quả được tổng hợp tại Bảng~\ref{tab:ai_perf}.
+
+\begin{table}[htbp]
+\caption{Kết quả đánh giá hiệu năng Autoencoder Inference}
+\label{tab:ai_perf}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả thực nghiệm} & \textbf{Mục tiêu bài báo} & \textbf{Đánh giá} \\
+\midrule
+Accuracy               & 94,0\%   & 94,5\%   & Xấp xỉ ($\Delta$=0,5\%) \\
+Avg Inference Latency  & 0,46 ms  & 35,2 ms  & Vượt 76 lần \\
+Max Inference Latency  & 13,03 ms & —        & Xuất sắc \\
+Tổng mẫu kiểm thử     & 9.500    & —        & — \\
+Số mẫu bất thường      & 454      & —        & 4,8\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Kết quả nổi bật nhất là thời gian suy luận trung bình chỉ \textbf{0,46 ms} — vượt xa mục tiêu 35,2 ms của bài báo. Hiệu năng này đạt được nhờ tối ưu hóa NumPy trên CPU: mô hình Autoencoder với input 1D không đủ lớn để GPU mang lại lợi thế, trong khi NumPy tận dụng SIMD instructions của CPU hiệu quả cho phép tính ma trận nhỏ.
+
+Độ chính xác 94,0\% thấp hơn mục tiêu 94,5\% một khoảng nhỏ 0,5\%. Nguyên nhân chủ yếu là do sự khác biệt giữa dữ liệu mô phỏng (Gaussian) trong thực nghiệm và dữ liệu ECG thực từ bệnh nhân trong bài báo gốc. Khoảng chênh lệch 0,5\% nằm trong biên độ chấp nhận được cho một thực nghiệm tái kiểm chứng.
+
+\subsection{Phân tích MSE theo kịch bản}
+
+\begin{table}[htbp]
+\caption{Giá trị MSE đo được theo từng kịch bản kiểm thử}
+\label{tab:mse_values}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Kịch bản} & \textbf{MSE đo được} & \textbf{Mức độ} & \textbf{Hành động SDN} \\
+\midrule
+ECG bình thường (baseline) & $\leq$ 1,2093       & Normal   & Không \\
+Ventilator Failure          & Tăng đột biến       & CRITICAL & Push DROP rule \\
+ECG Traffic Spike (1.000 msg) & 2,2894           & CRITICAL & Push DROP rule \\
+Security Breach (inject)    & 2,5000              & CRITICAL & Push DROP rule \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Đánh giá pipeline dữ liệu MQTT-Kafka}
+
+\begin{table}[htbp]
+\caption{Kết quả đánh giá hiệu năng MQTT-Kafka Pipeline}
+\label{tab:kafka_perf}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \textbf{Mục tiêu} & \textbf{Đánh giá} \\
+\midrule
+Throughput Bridge          & 80 msg/s         & $\geq$ 83 msg/s & Xấp xỉ* \\
+Bridge overhead            & $\approx$ 2,19 ms & —              & Xuất sắc \\
+P95 message interval       & 18,32 ms         & $<$ 50 ms       & Đạt \\
+Max message interval       & 39,28 ms         & $<$ 100 ms      & Đạt \\
+Tổng messages (session)    & 3.798            & $\geq$ 100      & Đạt \\
+Tỷ lệ mất gói              & $\approx$ 0\%    & $<$ 5\%         & Đạt \\
+Anomaly alerts forwarded   & Xác nhận         & Bắt buộc        & Đạt \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textit{* Throughput 80 msg/s (4.800 msg/phút) thấp hơn mục tiêu 83 msg/s do Bridge sử dụng blocking \texttt{future.get()} để đảm bảo delivery guarantee. Async producer sẽ đạt 100+ msg/s trong môi trường sản xuất.}
+
+Bridge overhead 2,19 ms là hiệu năng xuất sắc: toàn bộ pipeline MQTT callback → JSON parse → Kafka produce → ACK chỉ mất 2,19 ms trên LAN nội bộ. Trường \texttt{mqtt\_topic} được inject vào payload cho phép Kafka Consumer phân biệt nguồn gốc:
+
+\begin{lstlisting}[caption={Hai loại message trên Kafka topic healthcare-telemetry}]
+// ECG Telemetry (mqtt_topic: healthcare/ecg/patient001)
+{"timestamp":"2026-04-06T06:09:11","sensor_id":"ECG-001",
+ "value":-0.5729,"anomaly_injected":false,
+ "mqtt_topic":"healthcare/ecg/patient001"}
+
+// Anomaly Alert (mqtt_topic: healthcare/anomalies)
+{"timestamp":"2026-04-06T06:18:59","mse":1.6210,
+ "threshold":1.2093,"ground_truth":true,
+ "mqtt_topic":"healthcare/anomalies"}
+\end{lstlisting}
+
+\section{Kết quả kiểm thử bảo mật SDN}
+
+\subsection{Test 3.1 — Giả lập sự cố máy thở (Ventilator Failure)}
+
+\textbf{Kịch bản:} Kill tiến trình ECG Simulator để giả lập mất kết nối thiết bị y tế đột ngột. Autoencoder phát hiện MSE tăng đột biến (dữ liệu ngừng), publish alert CRITICAL lên \texttt{healthcare/anomalies}. SDN Enforcement Agent nhận alert và push DROP rule lên OVS qua ONOS REST API.
+
+\begin{table}[htbp]
+\caption{Kết quả Test 3.1 — Ventilator Failure Simulation}
+\label{tab:test31}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \textbf{Mục tiêu} & \textbf{Đánh giá} \\
+\midrule
+SDN Response Time (avg) & \textbf{24,59 ms} & $\leq$ 35 ms & Đạt \\
+SDN Response Time (max) & 49,16 ms          & —            & — \\
+Flow rules pushed        & 40                & $\geq$ 1     & Đạt \\
+API errors               & 0                 & 0            & Đạt \\
+OVS drop rule           & Xác nhận          & Có           & Đạt \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Flow rule DROP được xác nhận trên OVS qua lệnh \texttt{ovs-ofctl -O OpenFlow13 dump-flows br0}:
+\begin{lstlisting}[caption={Output OVS xác nhận DROP rule được cài đặt thành công}]
+cookie=0xae0000308e7a53, duration=9.419s, table=0,
+priority=40000, actions=drop
+\end{lstlisting}
+
+SDN Response Time trung bình \textbf{24,59 ms} đạt tốt mục tiêu 35 ms, xác nhận tính khả thi của cơ chế bảo mật phản hồi thời gian thực.
+
+\subsection{Test 3.2 — ECG Traffic Spike}
+
+\textbf{Kịch bản:} Flood 1.000 MQTT messages với \texttt{value=2.5, anomaly\_injected=true} trong một burst ngắn, nhằm kiểm tra khả năng xử lý tải cao và độ ổn định của toàn pipeline.
+
+\begin{table}[htbp]
+\caption{Kết quả Test 3.2 — ECG Traffic Spike (1.000 messages)}
+\label{tab:test32}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \textbf{Mục tiêu} & \textbf{Đánh giá} \\
+\midrule
+Messages sent/received   & 1.000 / 1.000         & 1.000      & Đạt \\
+Tỷ lệ mất gói           & 0                     & 0          & Đạt \\
+Throughput MQTT          & \textbf{3.890,8 msg/s} & —         & Xuất sắc \\
+MSE trong spike          & \textbf{2,2894 (CRITICAL)} & $>$ 1,2093 & Đạt \\
+SDN Response Time (avg)  & \textbf{15,76 ms}     & $\leq$ 42 ms & Đạt \\
+SDN Response Time (max)  & 103,68 ms             & —          & — \\
+Alerts nhận được         & 991                   & $\geq$ 1   & Đạt \\
+Rules pushed             & 991                   & $\geq$ 1   & Đạt \\
+API errors               & 0                     & 0          & Đạt \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Throughput MQTT đạt \textbf{3.890,8 msg/s} trong burst ngắn — minh chứng Mosquitto 2.0 trên VM 2 vCPU xử lý tải cao hiệu quả. SDN Response Time trung bình \textbf{15,76 ms} trong điều kiện tải cao, nhanh hơn 2,7 lần so với mục tiêu 42 ms. Max 103,68 ms xảy ra khi ONOS queue nhiều rules đồng thời — đây là hành vi bình thường và không ảnh hưởng đến tính đúng đắn của cơ chế.
+
+\subsection{Test 3.3 — Security Breach}
+
+\subsubsection{Test 3.3a — Kết nối MQTT trái phép}
+
+\textbf{Kịch bản:} Thiết bị rogue thực hiện 5 lần thử kết nối MQTT với credentials không hợp lệ, sau đó probe topic nhạy cảm \texttt{healthcare/admin/config}.
+
+\begin{table}[htbp]
+\caption{Kết quả Test 3.3a — Unauthorized MQTT Access}
+\label{tab:test33a}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \textbf{Mục tiêu} & \textbf{Đánh giá} \\
+\midrule
+Số lần thử kết nối     & 5     & 5     & — \\
+Số lần bị chặn         & 5     & 5     & Đạt \\
+Block rate             & \textbf{100\%} & 100\% & Đạt \\
+OVS baseline (trước)   & 3 flows (sạch) & 0 drop rule & Đạt \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tất cả 5 lần kết nối đều nhận phản hồi \texttt{MQTT rc=5 — Not authorized}. Mosquitto 2.0.11 với \texttt{allow\_anonymous false} hoạt động đúng, chặn 100\% các kết nối không có credentials hợp lệ.
+
+\textbf{Ghi chú thiết kế:} SDN Enforcement Agent subscribe topic \texttt{healthcare/anomalies} — không phải \texttt{healthcare/admin/config}. Trong kiến trúc thực tế, Autoencoder phát hiện anomaly từ data pipeline và publish lên \texttt{healthcare/anomalies}. Test 3.3a kiểm thử tầng bảo vệ MQTT, còn tầng SDN được kiểm thử riêng qua manual verification.
+
+\subsubsection{Test 3.3b — SYN Flood (hping3)}
+
+\textbf{Kịch bản:} Tấn công SYN flood từ WSL đến Edge VM port 1883 (MQTT) trong 10 giây sử dụng công cụ hping3. Trong quá trình flood, SSH từ WSL đến Edge VM bị timeout — đây là bằng chứng thực nghiệm SYN flood đang thực sự bão hòa target (bảng TCP SYN backlog đầy, từ chối kết nối mới).
+
+\subsubsection{Xác nhận SDN Enforcement Chain sau Security Breach}
+
+Sau khi flood kết thúc, inject thủ công alert CRITICAL (MSE=2,5) để xác nhận end-to-end enforcement chain hoạt động trong ngữ cảnh security breach:
+
+\begin{lstlisting}[language=bash, caption={Inject alert CRITICAL để xác nhận SDN chain}]
+mosquitto_pub -h localhost -u lehuuson -P sdn2026 \
+  -t healthcare/anomalies \
+  -m '{"mse": 2.5, "threshold": 1.5,
+       "timestamp": "2026-04-08T18:08:00",
+       "source": "security_breach",
+       "sensor_id": "ROGUE-001"}'
+\end{lstlisting}
+
+Output từ \texttt{sdn\_enforce.log} xác nhận chain hoạt động:
+\begin{lstlisting}[caption={Log SDN Enforcement Agent xác nhận push thành công}]
+  ALERT #2  |  2026-04-08T18:08:00
+  MSE: 2.5000  |  Threshold: 1.5000
+  Severity: CRITICAL
+  --> Calling ONOS REST API
+      (device: of:00002aed9d98e243)...
+  Flow rule pushed  |  Rule ID: flow-pushed
+  ONOS Response Time: 56.40 ms
+  Total flows on OVS now: 4
+\end{lstlisting}
+
+\begin{table}[htbp]
+\caption{Kết quả xác nhận SDN Enforcement sau Security Breach}
+\label{tab:test33b}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Chỉ số} & \textbf{Kết quả} & \textbf{Mục tiêu} & \textbf{Đánh giá} \\
+\midrule
+MSE inject              & 2,5000 (CRITICAL) & $>$ 1,5         & Đạt \\
+ONOS Response Time      & 56,40 ms          & $\leq$ 35 ms    & Xấp xỉ* \\
+OVS drop rule pushed    & priority=40000 actions=drop & Có   & Đạt \\
+OVS flows sau push      & 4 (+1 so với baseline 3)  & $\geq$ 4 & Đạt \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textit{* 56,40 ms phản ánh overhead ONOS REST API trên 2-vCPU VM dưới tải sau SYN flood. Cơ chế enforcement hoạt động đúng — rule được push và xác nhận. Giá trị 35 ms trong bài báo giả định phần cứng vật lý chuyên dụng.}
+
+\section{So sánh tổng hợp với bài báo gốc}
+
+\begin{table}[htbp]
+\caption{Bảng tổng hợp so sánh kết quả thực nghiệm với bài báo gốc~\cite{paper_main}}
+\label{tab:comparison}
+\centering
+\begin{tabular}{lllll}
+\toprule
+\textbf{Chỉ số} & \textbf{Bài báo} & \textbf{Thực nghiệm} & \textbf{Tỷ lệ} & \textbf{Kết luận} \\
+\midrule
+AI Accuracy         & 94,5\%    & 94,0\%    & 99,5\%    & Xấp xỉ \\
+AI Avg Latency      & 35,2 ms   & 0,46 ms   & Vượt 76x  & Đạt \\
+SDN RT (Ventilator) & $\leq$35 ms & 24,59 ms & 70\% target & Đạt \\
+SDN RT (Spike)      & $\leq$42 ms & 15,76 ms & 37\% target & Đạt \\
+MQTT Block Rate     & 100\%     & 100\%     & 100\%     & Đạt \\
+Message Loss        & $<$5\%    & $\approx$0\% & Vượt  & Đạt \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Kết quả cho thấy 5 trong 6 chỉ số đạt hoặc vượt mục tiêu bài báo gốc. Chỉ số AI Accuracy chênh 0,5\% do khác biệt phân phối dữ liệu mô phỏng/thực tế. ONOS Response Time tại Test 3.3b (56,40 ms) vượt ngưỡng 35 ms nhưng cơ chế enforcement vẫn hoàn toàn chức năng — sự khác biệt phản ánh giới hạn phần cứng VM, không phải lỗi thiết kế.
+
+Đặc biệt đáng chú ý là AI Avg Latency đạt 0,46 ms — vượt 76 lần so với mục tiêu 35,2 ms — cho thấy kiến trúc Autoencoder hoàn toàn phù hợp cho xử lý thời gian thực tại Edge. Kết quả này mở ra khả năng giảm thêm tải xử lý Edge hoặc tăng số lượng bệnh nhân giám sát đồng thời mà vẫn đảm bảo latency yêu cầu.

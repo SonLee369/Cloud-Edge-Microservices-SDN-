@@ -1,0 +1,253 @@
+\chapter{TRIỂN KHAI VÀ CẤU HÌNH HỆ THỐNG}
+
+\section{Môi trường thực nghiệm}
+
+Hệ thống được triển khai trên ba máy ảo VMware Workstation chạy Ubuntu Server 22.04 LTS, kết nối với nhau qua mạng VMnet nội bộ (192.168.182.0/24). Bảng~\ref{tab:env_nodes} và Bảng~\ref{tab:env_software} liệt kê chi tiết cấu hình phần cứng và phần mềm.
+
+\begin{table}[htbp]
+\caption{Cấu hình phần cứng các node trong môi trường thực nghiệm}
+\label{tab:env_nodes}
+\centering
+\begin{tabular}{lllll}
+\toprule
+\textbf{Node} & \textbf{Hostname} & \textbf{Địa chỉ IP} & \textbf{vCPU} & \textbf{RAM} \\
+\midrule
+Master VM & sdn-master & 192.168.182.10 & 2 & 4 GB \\
+Cloud VM  & sdn-cloud  & 192.168.182.20 & 1 & 2 GB \\
+Edge VM   & sdn-edge   & 192.168.182.30 & 2 & 3 GB \\
+WSL Host  & (Windows)  & 192.168.182.1  & — & —    \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Phiên bản phần mềm được sử dụng trong hệ thống}
+\label{tab:env_software}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Phần mềm} & \textbf{Phiên bản} & \textbf{Node} & \textbf{Vai trò} \\
+\midrule
+Ubuntu Server   & 22.04 LTS & Tất cả & Hệ điều hành \\
+ONOS            & 2.7.0     & Master  & SDN Controller \\
+K3s Kubernetes  & v1.29     & Master  & Container orchestration \\
+Apache Kafka    & 3.7.0     & Cloud   & Message streaming \\
+Open vSwitch    & 2.17.9    & Edge    & SDN data plane \\
+Mosquitto MQTT  & 2.0.11    & Edge    & IoT message broker \\
+Python          & 3.10      & Edge    & AI và agent runtime \\
+paho-mqtt       & 2.1.0     & Edge    & MQTT client library \\
+kafka-python    & 2.3.0     & Edge    & Kafka producer library \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Triển khai tầng điều khiển (Master VM)}
+
+\subsection{ONOS SDN Controller}
+
+ONOS 2.7 được triển khai bằng Docker để đảm bảo tính di động và tái tạo môi trường. Lệnh khởi động:
+
+\begin{lstlisting}[language=bash, caption={Khởi động ONOS SDN Controller qua Docker}]
+docker run -d --name onos \
+  -p 8181:8181 \   # REST API + Web GUI
+  -p 6653:6653 \   # OpenFlow
+  -p 8101:8101 \   # ONOS CLI
+  --restart unless-stopped \
+  onosproject/onos:2.7.0
+\end{lstlisting}
+
+Sau khi container khởi động, kích hoạt ứng dụng OpenFlow qua REST API:
+
+\begin{lstlisting}[language=bash, caption={Kích hoạt ứng dụng OpenFlow trên ONOS}]
+curl -u onos:rocks -X POST \
+  http://localhost:8181/onos/v1/applications/\
+org.onosproject.openflow/active
+\end{lstlisting}
+
+Xác nhận ONOS đang lắng nghe trên port 6653 và REST API hoạt động:
+\begin{lstlisting}[language=bash]
+curl -u onos:rocks \
+  http://localhost:8181/onos/v1/devices
+# --> {"devices": [...]}  OK
+\end{lstlisting}
+
+\section{Triển khai tầng dữ liệu (Edge VM)}
+
+\subsection{Cài đặt Open vSwitch và kết nối ONOS}
+
+Open vSwitch được cài đặt từ repository Ubuntu và cấu hình kết nối đến ONOS Controller:
+
+\begin{lstlisting}[language=bash, caption={Cài đặt và cấu hình Open vSwitch}]
+sudo apt install openvswitch-switch -y
+
+# Tạo bridge br0
+sudo ovs-vsctl add-br br0
+
+# Kết nối đến ONOS Controller
+sudo ovs-vsctl set-controller br0 tcp:192.168.182.10:6653
+
+# Bắt buộc dùng OpenFlow 1.3
+sudo ovs-vsctl set bridge br0 protocols=OpenFlow13
+
+# Kiểm tra trạng thái kết nối
+sudo ovs-vsctl show
+\end{lstlisting}
+
+Sau khi cấu hình, ONOS nhận diện Edge VM với Device ID \texttt{of:00002aed9d98e243}, trạng thái \texttt{available: true}. Đây là định danh quan trọng được sử dụng trong tất cả lệnh gọi REST API đến ONOS.
+
+\textbf{Vấn đề kỹ thuật gặp phải:} Lệnh \texttt{ovs-ofctl} mặc định dùng OpenFlow 1.0. Khi OVS đã cấu hình OF 1.3, bắt buộc phải thêm flag \texttt{-O OpenFlow13} vào mọi lệnh \texttt{ovs-ofctl}, nếu không sẽ nhận lỗi \textit{"version negotiation failed"}.
+
+\begin{lstlisting}[language=bash, caption={Xem flow rules trên OVS (OpenFlow 1.3)}]
+# Sai -- default OpenFlow 1.0
+sudo ovs-ofctl dump-flows br0
+
+# Đúng
+sudo ovs-ofctl -O OpenFlow13 dump-flows br0
+\end{lstlisting}
+
+\subsection{Cấu hình Mosquitto MQTT Broker với xác thực}
+
+Mosquitto 2.0.11 có thay đổi thiết kế quan trọng so với phiên bản 1.x: để \texttt{allow\_anonymous false} có hiệu lực, bắt buộc phải khai báo directive \texttt{listener} tường minh trong cùng file cấu hình. Thiếu directive này, Mosquitto 2.0 bỏ qua toàn bộ cấu hình auth.
+
+File cấu hình cuối cùng sau khi xử lý conflict:
+\begin{lstlisting}[caption={/etc/mosquitto/conf.d/auth.conf — cấu hình bảo mật}]
+listener 1883 0.0.0.0
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+\end{lstlisting}
+
+Tạo tài khoản và xác nhận hoạt động:
+\begin{lstlisting}[language=bash, caption={Tạo tài khoản MQTT và kiểm tra xác thực}]
+sudo mosquitto_passwd -c /etc/mosquitto/passwd lehuuson
+# Nhập password: sdn2026
+
+# Test -- kết nối không credentials --> phải bị từ chối
+mosquitto_pub -h localhost -t test -m ping
+# --> Connection Refused: not authorised  [OK]
+
+# Test -- kết nối có credentials --> phải thành công
+mosquitto_pub -h localhost -t test -m ping \
+              -u lehuuson -P sdn2026
+# --> (không output = thành công)  [OK]
+\end{lstlisting}
+
+Ba vấn đề kỹ thuật gặp phải trong quá trình cấu hình Mosquitto được tổng hợp tại Bảng~\ref{tab:mosquitto_issues}.
+
+\begin{table}[htbp]
+\caption{Các vấn đề kỹ thuật Mosquitto và giải pháp khắc phục}
+\label{tab:mosquitto_issues}
+\centering
+\begin{tabular}{p{0.22\textwidth}p{0.32\textwidth}p{0.32\textwidth}}
+\toprule
+\textbf{Triệu chứng} & \textbf{Nguyên nhân gốc} & \textbf{Giải pháp} \\
+\midrule
+Anonymous pub vẫn thành công dù đã cấu hình & Mosquitto 2.0+ yêu cầu \texttt{listener} directive tường minh & Thêm \texttt{listener 1883 0.0.0.0} vào auth.conf \\[4pt]
+Port 1883 bị chiếm & File \texttt{custom.conf} có sẵn listener gây conflict & Disable custom.conf \\[4pt]
+SSH sudo no TTY & Script tự động không có flag \texttt{-t} & SSH trực tiếp vào VM \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Cài đặt Autoencoder Inference Engine}
+
+Mô hình Autoencoder được huấn luyện trước và lưu dưới dạng file weights. Khi deploy lên Edge VM, module chạy với flag \texttt{-u} (unbuffered stdout) khi dùng \texttt{nohup} để đảm bảo log được ghi ra file ngay lập tức:
+
+\begin{lstlisting}[language=bash, caption={Khởi động Autoencoder Inference (nền)}]
+nohup python3 -u autoencoder_inference.py \
+  > autoencoder.log 2>&1 &
+echo "PID: $!"
+\end{lstlisting}
+
+\textbf{Vấn đề kỹ thuật:} Python buffer stdout khi redirect file, dẫn đến log trống khi xem trong quá trình chạy. Flag \texttt{-u} giải quyết vấn đề này bằng cách disable buffering.
+
+\subsection{Cài đặt SDN Enforcement Agent}
+
+Module \texttt{sdn\_enforcement.py} subscribe MQTT và gọi ONOS REST API. Trong quá trình phát triển, hai lỗi kỹ thuật quan trọng được phát hiện và khắc phục:
+
+\begin{itemize}
+    \item \textbf{ONOS HTTP 400:} Body JSON ban đầu wrap flow rule trong array \texttt{\{"flows":[...]\}}. ONOS endpoint \texttt{/onos/v1/flows} yêu cầu single flow object, không phải array. Sửa bằng cách dùng single flow body kết hợp \texttt{appId} query parameter.
+    \item \textbf{JSONDecodeError:} ONOS trả HTTP 201 với body rỗng khi push flow thành công. Lệnh \texttt{r.json()} raise exception. Sửa bằng try/except bao quanh lệnh parse JSON.
+\end{itemize}
+
+Cấu hình ONOS REST API call:
+\begin{lstlisting}[language=python, caption={Gọi ONOS REST API để push flow rule DROP}]
+ONOS_URL = "http://192.168.182.10:8181"
+DEVICE_ID = "of:00002aed9d98e243"
+
+flow_body = {
+    "priority": 40000,
+    "deviceId": DEVICE_ID,
+    "treatment": {
+        "instructions": [{"type": "DROP"}]
+    }
+}
+r = requests.post(
+    f"{ONOS_URL}/onos/v1/flows",
+    params={"appId": "org.onosproject.core"},
+    json=flow_body,
+    auth=("onos", "rocks"),
+    timeout=5
+)
+# HTTP 201 = thành công
+\end{lstlisting}
+
+\section{Triển khai tầng ứng dụng (Cloud VM)}
+
+\subsection{Apache Kafka với Docker Compose}
+
+Kafka 3.7.0 được triển khai bằng Docker Compose với cấu hình KRaft. Tối ưu bộ nhớ cho VM 2 GB RAM:
+
+\begin{lstlisting}[caption={Cấu hình bộ nhớ Kafka cho VM giới hạn RAM}]
+KAFKA_HEAP_OPTS: "-Xmx512M -Xms256M"
+KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://192.168.182.20:9092
+KAFKA_NUM_PARTITIONS: 3
+\end{lstlisting}
+
+\textbf{Lưu ý:} Docker health check báo \texttt{unhealthy} là false alarm — broker hoạt động bình thường. Vấn đề do health check script timeout, không phải do Kafka lỗi.
+
+\subsection{Thiết lập MQTT-Kafka Bridge}
+
+Bridge cần được cập nhật credentials MQTT sau khi bật authentication tại Mosquitto. Khởi động Bridge:
+
+\begin{lstlisting}[language=bash, caption={Khởi động MQTT-Kafka Bridge}]
+# Cài đặt dependencies
+pip3 install paho-mqtt==2.1.0 kafka-python==2.3.0
+
+# Chạy Bridge
+nohup python3 -u mqtt_kafka_bridge.py \
+  > bridge.log 2>&1 &
+\end{lstlisting}
+
+\section{Thiết lập bảo mật bổ sung}
+
+\subsection{Passwordless SSH từ WSL}
+
+Thiết lập SSH key authentication từ WSL đến Edge VM để các test script đọc OVS flows tự động mà không cần password tương tác:
+
+\begin{lstlisting}[language=bash, caption={Cấu hình SSH key authentication}]
+# Tạo SSH key pair
+sudo ssh-keygen -t rsa -b 4096 \
+  -f /root/.ssh/id_rsa -N ""
+
+# Copy public key sang Edge VM
+sudo ssh-copy-id lehuuson@192.168.182.30
+
+# Xác nhận
+sudo ssh -o BatchMode=yes \
+  lehuuson@192.168.182.30 "echo SSH_OK"
+# --> SSH_OK  [OK]
+\end{lstlisting}
+
+\subsection{Cấu hình NOPASSWD Sudoers}
+
+Cho phép lệnh \texttt{sudo ovs-ofctl} và \texttt{sudo iptables} qua SSH không cần password:
+
+\begin{lstlisting}[language=bash, caption={Cấu hình sudoers cho OVS commands}]
+echo "lehuuson ALL=(ALL) NOPASSWD: \
+  /usr/bin/ovs-ofctl, /usr/sbin/iptables" \
+  | sudo tee /etc/sudoers.d/nopasswd-ovs
+
+# Xác nhận cú pháp đúng
+sudo visudo -c -f /etc/sudoers.d/nopasswd-ovs
+# --> parsed OK  [OK]
+\end{lstlisting}

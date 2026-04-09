@@ -1,0 +1,153 @@
+\chapter{KIẾN TRÚC HỆ THỐNG ĐỀ XUẤT}
+
+\section{Tổng quan kiến trúc ba tầng}
+
+Hệ thống được tổ chức theo kiến trúc ba tầng tuân theo mô hình SDN chuẩn, đồng thời mở rộng sang Cloud-Edge để phù hợp với yêu cầu xử lý dữ liệu y tế thời gian thực. Ba tầng kiến trúc bao gồm: Tầng Dữ liệu (Data Plane) tại Edge, Tầng Điều khiển (Control Plane) tại Master và Tầng Ứng dụng (Application Plane) trên Cloud (Hình~\ref{fig:arch_3tier}).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners=4pt, minimum width=11cm,
+                minimum height=1.3cm, align=center, font=\small},
+    arr/.style={-{Stealth[scale=1.2]}, thick, gray}
+]
+\node[box, fill=blue!12] (app)  at (0, 0)
+    {\textbf{TẦNG ỨNG DỤNG — Cloud VM (192.168.182.20)}\\
+     Apache Kafka 3.7.0 (KRaft) · Monitoring Backend};
+
+\node[box, fill=green!12] (ctrl) at (0,-2.6)
+    {\textbf{TẦNG ĐIỀU KHIỂN — Master VM (192.168.182.10)}\\
+     K3s Kubernetes · ONOS SDN Controller 2.7};
+
+\node[box, fill=orange!12] (data) at (0,-5.2)
+    {\textbf{TẦNG DỮ LIỆU — Edge VM (192.168.182.30)}\\
+     Open vSwitch · Mosquitto MQTT · ECG Simulator · Autoencoder AI · SDN Agent};
+
+\draw[arr] (app.south) -- node[right,font=\footnotesize]{Kafka Streams / REST API} (ctrl.north);
+\draw[arr] (ctrl.south) -- node[right,font=\footnotesize]{OpenFlow 1.3 (TCP 6653)} (data.north);
+\draw[arr] (data.north) to[bend right=40] node[left,font=\footnotesize]{MQTT-Kafka Bridge} (app.south);
+\end{tikzpicture}
+\caption{Kiến trúc ba tầng Cloud-Edge SDN + AI Healthcare}
+\label{fig:arch_3tier}
+\end{figure}
+
+Dữ liệu lưu thông theo hai luồng song song:
+\begin{itemize}
+    \item \textbf{Luồng điều khiển (Control Path):} Từ ONOS Controller xuống OVS qua kênh OpenFlow 1.3 — mang flow rules bảo mật.
+    \item \textbf{Luồng dữ liệu (Data Path):} Từ thiết bị IoT lên Cloud Kafka qua chuỗi MQTT → Bridge → Kafka — mang telemetry y tế.
+\end{itemize}
+
+\section{Tầng Dữ liệu (Data Plane) — Edge VM}
+
+Tầng Dữ liệu vận hành tại Edge VM (192.168.182.30, 2 vCPU, 3 GB RAM) và chứa năm thành phần chính, hoạt động phối hợp để tạo thành pipeline xử lý AI và bảo mật thời gian thực.
+
+\subsection{ECG Simulator}
+
+Module \texttt{ecg\_simulator.py} mô phỏng luồng tín hiệu điện tâm đồ từ bệnh nhân. Mỗi 100 ms (tần suất 10 Hz), module tạo một giá trị ECG theo phân phối Gaussian và publish lên MQTT topic \texttt{healthcare/ecg/patient001}. Bất thường được inject với xác suất 5\% bằng cách thêm nhiễu lớn vào giá trị, tạo dataset cân bằng cho đánh giá AI.
+
+Payload JSON của mỗi message:
+\begin{lstlisting}[caption={Cấu trúc MQTT message từ ECG Simulator}]
+{
+  "timestamp": "2026-04-06T06:09:11.199477",
+  "sensor_id": "ECG-001",
+  "patient_id": "patient001",
+  "value": -0.5729,
+  "anomaly_injected": false
+}
+\end{lstlisting}
+
+\subsection{Autoencoder Inference Engine}
+
+Module \texttt{autoencoder\_inference.py} thực hiện suy luận AI theo thời gian thực. Kiến trúc Autoencoder gồm các lớp Fully Connected đối xứng:
+\begin{itemize}
+    \item Encoder: $128 \to 64 \to 32$ chiều.
+    \item Decoder: $32 \to 64 \to 128$ chiều.
+    \item Activation: ReLU tại các lớp ẩn, Linear tại lớp đầu ra.
+\end{itemize}
+
+Module subscribe \texttt{healthcare/ecg/\#}, tính MSE theo Phương trình~\ref{eq:mse} và áp dụng logic phân loại ba mức:
+
+\begin{table}[htbp]
+\caption{Ngưỡng MSE và hành động tương ứng}
+\label{tab:mse_logic}
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Mức độ} & \textbf{Điều kiện MSE} & \textbf{Hành động} \\
+\midrule
+Bình thường & $\leq 1{,}2093$ & Ghi log bình thường \\
+WARNING     & $1{,}2093 < \text{MSE} \leq 1{,}5$ & Ghi log cảnh báo \\
+CRITICAL    & $> 1{,}5$ & Publish alert lên \texttt{healthcare/anomalies} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Mosquitto MQTT Broker}
+
+Mosquitto 2.0.11 đóng vai trò message broker trung tâm tại Edge. Broker được cấu hình bảo mật với \texttt{allow\_anonymous false} — tất cả client phải xác thực bằng username và password. Đây là điểm kiểm soát truy cập đầu tiên ngăn chặn thiết bị trái phép kết nối vào hệ thống y tế.
+
+\subsection{SDN Enforcement Agent}
+
+Module \texttt{sdn\_enforcement.py} là cầu nối giữa pipeline AI và hạ tầng SDN. Khi nhận alert CRITICAL, module gọi ONOS REST API để push flow rule DROP vào OVS với priority 40000 — giá trị đủ cao để ưu tiên xử lý trước mọi flow rule thông thường (thường ở mức 100–1000).
+
+\subsection{Open vSwitch (OVS)}
+
+OVS 2.17.9 tạo bridge \texttt{br0} kết nối ONOS qua OpenFlow 1.3. OVS là điểm thực thi cuối cùng của cơ chế bảo mật: flow rules DROP được áp dụng tại kernel space để chặn lưu lượng độc hại ngay tại tầng mạng với hiệu năng cao nhất.
+
+\section{Tầng Điều khiển (Control Plane) — Master VM}
+
+\subsection{ONOS SDN Controller}
+
+ONOS 2.7 chạy trong Docker container trên Master VM (192.168.182.10, 2 vCPU, 4 GB RAM), expose REST API tại port 8181 và lắng nghe OpenFlow tại port 6653.
+
+ONOS duy trì cơ sở dữ liệu topology bao gồm trạng thái tất cả thiết bị SDN đã kết nối. Edge VM được nhận diện với Device ID \texttt{of:00002aed9d98e243}. Khi nhận yêu cầu từ SDN Enforcement Agent, ONOS xác thực, tạo flow entry và push xuống OVS qua kênh OpenFlow 1.3 đang duy trì liên tục.
+
+\subsection{K3s Kubernetes}
+
+K3s (phiên bản Kubernetes nhẹ) được triển khai trên Master VM để quản lý vòng đời các microservices theo container. Trong phạm vi thực nghiệm này, K3s đóng vai trò hạ tầng orchestration, cung cấp nền tảng cho khả năng mở rộng trong tương lai.
+
+\section{Tầng Ứng dụng (Application Plane) — Cloud VM}
+
+\subsection{Apache Kafka}
+
+Apache Kafka 3.7.0 vận hành trên Cloud VM (192.168.182.20, 1 vCPU, 2 GB RAM) với chế độ KRaft — loại bỏ phụ thuộc vào Zookeeper, đơn giản hóa triển khai. Kafka cung cấp nền tảng streaming bền vững cho ba topic chính:
+
+\begin{itemize}
+    \item \texttt{healthcare-telemetry}: nhận toàn bộ dữ liệu telemetry từ Edge qua Bridge.
+    \item \texttt{hospital-alerts}: cảnh báo y tế ưu tiên cao.
+    \item \texttt{medical-telemetry}: dữ liệu phân tích dài hạn.
+\end{itemize}
+
+\subsection{MQTT-Kafka Bridge}
+
+Bridge là Python microservice chạy trên Edge VM, subscribe wildcard \texttt{healthcare/\#} trên Mosquitto và forward tất cả messages lên Kafka. Bridge inject trường \texttt{mqtt\_topic} vào payload để Consumer phân biệt nguồn gốc message — ECG telemetry hay anomaly alert.
+
+\section{Vòng lặp bảo mật SDN tự động}
+
+Thiết kế vòng lặp bảo mật tự động là đóng góp trung tâm của kiến trúc. Toàn bộ chuỗi phản hồi diễn ra mà không cần bất kỳ can thiệp thủ công nào (Hình~\ref{fig:sdn_loop}):
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.3cm,
+    block/.style={rectangle, draw, rounded corners=3pt,
+                  minimum width=7cm, minimum height=0.85cm,
+                  align=center, font=\small},
+    arr/.style={-{Stealth}, thick}
+]
+\node[block, fill=red!15]    (t1) {Bất thường phát hiện (MSE > 1,5)};
+\node[block, fill=yellow!15, below=of t1] (t2) {SDN Enforcement Agent\\publish \texttt{healthcare/anomalies} đã nhận};
+\node[block, fill=orange!15, below=of t2] (t3) {HTTP POST $\to$ ONOS REST API\\(\texttt{/onos/v1/flows?appId=...})};
+\node[block, fill=green!15, below=of t3]  (t4) {ONOS xác nhận \& push FLOW\_MOD\\qua kênh OpenFlow 1.3};
+\node[block, fill=blue!15, below=of t4]   (t5) {OVS br0 áp dụng:\\priority=40000, actions=drop};
+
+\draw[arr] (t1) -- node[right,font=\footnotesize]{\textit{MQTT alert}} (t2);
+\draw[arr] (t2) -- node[right,font=\footnotesize]{\textit{REST call}} (t3);
+\draw[arr] (t3) -- node[right,font=\footnotesize]{\textit{HTTP 201}} (t4);
+\draw[arr] (t4) -- node[right,font=\footnotesize]{\textit{OpenFlow}} (t5);
+\end{tikzpicture}
+\caption{Vòng lặp bảo mật SDN tự động — từ phát hiện đến thực thi}
+\label{fig:sdn_loop}
+\end{figure}
+
+Thiết kế này đảm bảo phản hồi trong hàng chục mili giây, phù hợp với yêu cầu thời gian thực của môi trường y tế quan trọng.

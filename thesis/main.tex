@@ -1,0 +1,214 @@
+\documentclass[13pt, a4paper]{report}
+
+%=============================================================================
+% PACKAGES
+%=============================================================================
+\usepackage{fontspec}
+\setmainfont{Times New Roman}[
+    BoldFont       = {Times New Roman Bold},
+    ItalicFont     = {Times New Roman Italic},
+    BoldItalicFont = {Times New Roman Bold Italic}
+]
+
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+
+\usepackage[
+    top=35mm, bottom=30mm,
+    left=35mm, right=20mm
+]{geometry}
+
+\usepackage{setspace}
+\onehalfspacing
+
+\usepackage{indentfirst}
+\setlength{\parindent}{12.7mm}
+
+% Header/Footer: chỉ số trang ở giữa đầu trang
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\chead{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Plain style (dùng cho \chapter*)
+\fancypagestyle{plain}{
+    \fancyhf{}
+    \chead{\thepage}
+    \renewcommand{\headrulewidth}{0pt}
+}
+
+%=============================================================================
+% HEADING STYLES
+%=============================================================================
+\usepackage{titlesec}
+
+% Chapter: 16pt, Bold, UPPERCASE, centered
+\titleformat{\chapter}[display]
+  {\fontsize{16}{20}\selectfont\bfseries\centering}
+  {CHƯƠNG \thechapter}
+  {6pt}
+  {\MakeUppercase}
+\titlespacing*{\chapter}{0pt}{-20pt}{24pt}
+
+% Section 1.x: 14pt, Bold, left
+\titleformat{\section}
+  {\fontsize{14}{18}\selectfont\bfseries}
+  {\thesection}
+  {1em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+
+% Subsection 1.x.x: 14pt, Bold Italic, left
+\titleformat{\subsection}
+  {\fontsize{14}{18}\selectfont\bfseries\itshape}
+  {\thesubsection}
+  {1em}{}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
+
+% Subsubsection 1.x.x.x: 14pt, Normal, left
+\titleformat{\subsubsection}
+  {\fontsize{14}{18}\selectfont}
+  {\thesubsubsection}
+  {1em}{}
+\titlespacing*{\subsubsection}{0pt}{10pt}{4pt}
+
+%=============================================================================
+% TABLES & FIGURES
+%=============================================================================
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit}
+
+\usepackage{caption}
+\DeclareCaptionFont{capfont}{\fontsize{12}{14}\selectfont\bfseries}
+\captionsetup[table]{
+    font=capfont, labelsep=colon,
+    justification=centering, position=above, skip=4pt
+}
+\captionsetup[figure]{
+    font=capfont, labelsep=colon,
+    justification=centering, position=below, skip=6pt
+}
+
+% Đánh số bảng/hình theo chương: Bảng 2.1, Hình 3.4
+\usepackage{chngcntr}
+\counterwithin{table}{chapter}
+\counterwithin{figure}{chapter}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+
+%=============================================================================
+% LISTINGS (code)
+%=============================================================================
+\usepackage{listings}
+\lstset{
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    showstringspaces=false,
+    keywordstyle=\bfseries,
+    commentstyle=\color{gray},
+    captionpos=b
+}
+
+%=============================================================================
+% MATH
+%=============================================================================
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+%=============================================================================
+% BIBLIOGRAPHY
+%=============================================================================
+\usepackage[
+    backend=biber,
+    style=numeric,
+    sorting=none,
+    citestyle=numeric-comp
+]{biblatex}
+\addbibresource{references.bib}
+
+%=============================================================================
+% TOC CUSTOMIZATION
+%=============================================================================
+\usepackage{tocloft}
+\renewcommand{\contentsname}{MỤC LỤC}
+\renewcommand{\listfigurename}{DANH MỤC HÌNH ẢNH}
+\renewcommand{\listtablename}{DANH MỤC BẢNG BIỂU}
+\renewcommand{\bibname}{TÀI LIỆU THAM KHẢO}
+\cftsetindents{chapter}{0em}{6.5em}
+\renewcommand{\cftchappresnum}{CHƯƠNG }
+\renewcommand{\cftchapaftersnum}{.}
+
+%=============================================================================
+% HYPERREF (cuối cùng)
+%=============================================================================
+\usepackage{hyperref}
+\hypersetup{colorlinks=false, hidelinks}
+
+%=============================================================================
+% DOCUMENT
+%=============================================================================
+\begin{document}
+
+%----------------------------------------------------------------------
+% FRONTMATTER — số La Mã
+%----------------------------------------------------------------------
+\pagenumbering{roman}
+\setcounter{page}{0}
+
+\input{chapters/cover}
+
+\input{chapters/commitment}
+
+{
+  \singlespacing
+  \tableofcontents
+  \newpage
+}
+
+\input{chapters/abbreviations}
+
+{
+  \singlespacing
+  \phantomsection
+  \addcontentsline{toc}{chapter}{DANH MỤC BẢNG BIỂU}
+  \listoftables
+  \newpage
+  \phantomsection
+  \addcontentsline{toc}{chapter}{DANH MỤC HÌNH ẢNH}
+  \listoffigures
+  \newpage
+}
+
+%----------------------------------------------------------------------
+% MAIN CONTENT — số Ả Rập
+%----------------------------------------------------------------------
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{chapters/intro}
+\input{chapters/chapter1}
+\input{chapters/chapter2}
+\input{chapters/chapter3}
+\input{chapters/chapter4}
+\input{chapters/conclusion}
+
+%----------------------------------------------------------------------
+% TÀI LIỆU THAM KHẢO
+%----------------------------------------------------------------------
+\newpage
+\phantomsection
+\printbibliography[heading=bibintoc, title={TÀI LIỆU THAM KHẢO}]
+
+\end{document}
